@@ -1,0 +1,731 @@
+<!-- main.html - Updated with modern design -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FEE-XMD - Advanced WhatsApp Bot</title>
+  <link rel="icon" type="image/x-icon" href="https://files.catbox.moe/el0qlh.jpeg">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --primary: #7c3aed;
+      --primary-dark: #5b21b6;
+      --secondary: #06b6d4;
+      --accent: #10b981;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+      --background: #0f172a;
+      --surface: #1e293b;
+      --surface-light: #334155;
+      --text-primary: #f1f5f9;
+      --text-secondary: #cbd5e1;
+      --text-muted: #94a3b8;
+      --gradient-primary: linear-gradient(135deg, #7c3aed 0%, #06b6d4 100%);
+      --gradient-secondary: linear-gradient(135deg, #06b6d4 0%, #10b981 100%);
+      --shadow-lg: 0 20px 40px rgba(0, 0, 0, 0.4);
+      --shadow-xl: 0 25px 50px rgba(0, 0, 0, 0.5);
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--background);
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      color: var(--text-primary);
+      overflow-x: hidden;
+    }
+
+    .navbar {
+      position: fixed;
+      top: 0;
+      width: 100%;
+      background: rgba(15, 23, 42, 0.92);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      z-index: 1000;
+      padding: 0.8rem 2rem;
+      border-bottom: 1px solid rgba(124, 58, 237, 0.2);
+      transition: all 0.3s ease;
+    }
+
+    .nav-container {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: white;
+      text-decoration: none;
+    }
+
+    .logo i { color: var(--primary); }
+
+    .nav-links {
+      display: flex;
+      gap: 1rem;
+      align-items: center;
+    }
+
+    .nav-links a {
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-weight: 500;
+      padding: 0.5rem 0.8rem;
+      border-radius: 8px;
+      transition: all 0.3s ease;
+      font-size: 0.95rem;
+    }
+
+    .nav-links a:hover {
+      color: white;
+      background: rgba(124, 58, 237, 0.1);
+    }
+
+    .nav-links a.active {
+      color: white;
+      background: rgba(124, 58, 237, 0.15);
+    }
+
+    .mobile-menu-btn {
+      display: none;
+      background: none;
+      border: none;
+      color: var(--text-primary);
+      font-size: 1.5rem;
+      cursor: pointer;
+    }
+
+    .hero {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 6rem 2rem 2rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero-bg {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: 
+        radial-gradient(circle at 20% 30%, rgba(124, 58, 237, 0.15) 0%, transparent 50%),
+        radial-gradient(circle at 80% 70%, rgba(6, 182, 212, 0.15) 0%, transparent 50%),
+        radial-gradient(circle at 50% 90%, rgba(16, 185, 129, 0.1) 0%, transparent 40%);
+      z-index: -1;
+    }
+
+    .floating-particles {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: -1;
+      overflow: hidden;
+    }
+
+    .particle {
+      position: absolute;
+      width: 4px;
+      height: 4px;
+      background: var(--primary);
+      border-radius: 50%;
+      opacity: 0.3;
+      animation: floatParticle linear infinite;
+    }
+
+    @keyframes floatParticle {
+      0% { transform: translateY(100vh) rotate(0deg); opacity: 0; }
+      10% { opacity: 0.3; }
+      90% { opacity: 0.3; }
+      100% { transform: translateY(-100vh) rotate(720deg); opacity: 0; }
+    }
+
+    .hero-content {
+      max-width: 800px;
+      text-align: center;
+      z-index: 1;
+    }
+
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(124, 58, 237, 0.15);
+      padding: 0.5rem 1.2rem;
+      border-radius: 50px;
+      border: 1px solid rgba(124, 58, 237, 0.3);
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+      margin-bottom: 1.5rem;
+    }
+
+    .hero-badge i { color: var(--accent); }
+
+    .hero-title {
+      font-size: 3.8rem;
+      font-weight: 900;
+      margin-bottom: 1.5rem;
+      line-height: 1.1;
+    }
+
+    .hero-title .gradient-text {
+      background: var(--gradient-primary);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+
+    .hero-subtitle {
+      font-size: 1.2rem;
+      color: var(--text-secondary);
+      margin-bottom: 2.5rem;
+      line-height: 1.7;
+      max-width: 600px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .hero-buttons {
+      display: flex;
+      gap: 1rem;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      padding: 0.9rem 2rem;
+      border-radius: 12px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      border: none;
+    }
+
+    .btn-primary {
+      background: var(--gradient-primary);
+      color: white;
+      box-shadow: 0 8px 25px rgba(124, 58, 237, 0.3);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 12px 35px rgba(124, 58, 237, 0.4);
+    }
+
+    .btn-secondary {
+      background: rgba(124, 58, 237, 0.1);
+      color: var(--text-primary);
+      border: 1px solid rgba(124, 58, 237, 0.3);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(124, 58, 237, 0.2);
+      transform: translateY(-3px);
+    }
+
+    .btn-success {
+      background: var(--gradient-secondary);
+      color: white;
+      box-shadow: 0 8px 25px rgba(6, 182, 212, 0.3);
+    }
+
+    .btn-success:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 12px 35px rgba(6, 182, 212, 0.4);
+    }
+
+    .stats-bar {
+      display: flex;
+      justify-content: center;
+      gap: 3rem;
+      margin-top: 3rem;
+      padding: 2rem;
+      background: rgba(30, 41, 59, 0.3);
+      border-radius: 16px;
+      border: 1px solid rgba(124, 58, 237, 0.1);
+      flex-wrap: wrap;
+    }
+
+    .stat-item { text-align: center; }
+
+    .stat-number {
+      font-size: 2rem;
+      font-weight: 800;
+      background: var(--gradient-primary);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+
+    .stat-label {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      margin-top: 0.3rem;
+    }
+
+    .section {
+      padding: 5rem 2rem;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .section-title {
+      text-align: center;
+      font-size: 2.5rem;
+      font-weight: 800;
+      margin-bottom: 1rem;
+      color: white;
+    }
+
+    .section-subtitle {
+      text-align: center;
+      color: var(--text-secondary);
+      max-width: 600px;
+      margin: 0 auto 3rem;
+      font-size: 1.1rem;
+    }
+
+    .section-title .highlight {
+      background: var(--gradient-primary);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 1.5rem;
+    }
+
+    .feature-card {
+      background: rgba(30, 41, 59, 0.6);
+      border-radius: 16px;
+      padding: 2rem;
+      border: 1px solid rgba(124, 58, 237, 0.1);
+      transition: all 0.3s ease;
+      text-align: center;
+    }
+
+    .feature-card:hover {
+      transform: translateY(-5px);
+      border-color: rgba(124, 58, 237, 0.3);
+      box-shadow: 0 15px 40px rgba(124, 58, 237, 0.1);
+    }
+
+    .feature-icon {
+      width: 60px;
+      height: 60px;
+      background: rgba(124, 58, 237, 0.1);
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 1rem;
+      font-size: 1.8rem;
+      color: var(--primary);
+    }
+
+    .feature-card h3 {
+      color: white;
+      font-size: 1.2rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .feature-card p {
+      color: var(--text-secondary);
+      font-size: 0.95rem;
+      line-height: 1.5;
+    }
+
+    .cta-section {
+      background: rgba(30, 41, 59, 0.4);
+      border-radius: 24px;
+      padding: 4rem;
+      text-align: center;
+      border: 1px solid rgba(124, 58, 237, 0.2);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .cta-section::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: var(--gradient-primary);
+      opacity: 0.05;
+    }
+
+    .cta-section h2 {
+      font-size: 2.5rem;
+      margin-bottom: 1rem;
+      position: relative;
+    }
+
+    .cta-section p {
+      color: var(--text-secondary);
+      max-width: 500px;
+      margin: 0 auto 2rem;
+      font-size: 1.1rem;
+      position: relative;
+    }
+
+    .footer {
+      text-align: center;
+      padding: 3rem 2rem;
+      border-top: 1px solid rgba(124, 58, 237, 0.1);
+      margin-top: 3rem;
+    }
+
+    .social-links {
+      display: flex;
+      justify-content: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+      margin: 1.5rem 0;
+    }
+
+    .social-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0.6rem 1.2rem;
+      background: rgba(124, 58, 237, 0.1);
+      color: var(--text-secondary);
+      text-decoration: none;
+      border-radius: 10px;
+      border: 1px solid rgba(124, 58, 237, 0.1);
+      transition: all 0.3s ease;
+      font-size: 0.9rem;
+    }
+
+    .social-link:hover {
+      background: rgba(124, 58, 237, 0.2);
+      color: white;
+      transform: translateY(-2px);
+    }
+
+    .footer p {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+    }
+
+    @media (max-width: 768px) {
+      .mobile-menu-btn { display: block; }
+      
+      .nav-links {
+        position: fixed;
+        top: 70px;
+        left: 0;
+        right: 0;
+        background: rgba(15, 23, 42, 0.98);
+        backdrop-filter: blur(20px);
+        flex-direction: column;
+        padding: 2rem;
+        gap: 1.2rem;
+        transform: translateY(-100%);
+        opacity: 0;
+        transition: all 0.3s ease;
+        border-bottom: 1px solid rgba(124, 58, 237, 0.2);
+      }
+
+      .nav-links.active {
+        transform: translateY(0);
+        opacity: 1;
+      }
+
+      .hero-title {
+        font-size: 2.5rem;
+      }
+
+      .section-title {
+        font-size: 2rem;
+      }
+
+      .stats-bar {
+        gap: 1.5rem;
+        padding: 1.5rem;
+      }
+
+      .cta-section {
+        padding: 2rem;
+      }
+
+      .cta-section h2 {
+        font-size: 1.8rem;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .hero-title {
+        font-size: 2rem;
+      }
+      
+      .hero-buttons .btn {
+        width: 100%;
+        justify-content: center;
+      }
+
+      .stat-number {
+        font-size: 1.5rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <nav class="navbar">
+    <div class="nav-container">
+      <a href="/" class="logo">
+        <i class="fas fa-robot"></i>
+        <span>FEE XMD</span>
+      </a>
+      
+      <button class="mobile-menu-btn" id="mobileMenuBtn">
+        <i class="fas fa-bars"></i>
+      </button>
+      
+      <div class="nav-links" id="navLinks">
+        <a href="/" class="active">Home</a>
+        <a href="/pair">Pair Bot</a>
+        <a href="/qr">QR Scanner</a>
+        <a href="#features">Features</a>
+        <a href="https://github.com/Fred1e/Fee-Xmd" target="_blank">
+          <i class="fab fa-github"></i> GitHub
+        </a>
+      </div>
+    </div>
+  </nav>
+
+  <section class="hero">
+    <div class="hero-bg"></div>
+    <div class="floating-particles" id="particles"></div>
+    
+    <div class="hero-content">
+      <div class="hero-badge">
+        <i class="fas fa-check-circle"></i>
+        Version 2.0 • 200+ Commands
+      </div>
+      
+      <h1 class="hero-title">
+        <span class="gradient-text">FEE XMD</span><br>
+        WhatsApp Bot
+      </h1>
+      
+      <p class="hero-subtitle">
+        Advanced AI-powered WhatsApp bot with media downloaders, AI chat, games, 
+        utilities, group management, and much more. Completely free and open source.
+      </p>
+      
+      <div class="hero-buttons">
+        <a href="/pair" class="btn btn-primary">
+          <i class="fas fa-link"></i> Pair Device
+        </a>
+        <a href="/qr" class="btn btn-success">
+          <i class="fas fa-qrcode"></i> Scan QR
+        </a>
+        <a href="#features" class="btn btn-secondary">
+          <i class="fas fa-list"></i> Features
+        </a>
+      </div>
+      
+      <div class="stats-bar">
+        <div class="stat-item">
+          <div class="stat-number">200+</div>
+          <div class="stat-label">Commands</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-number">50+</div>
+          <div class="stat-label">Downloaders</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-number">4.9★</div>
+          <div class="stat-label">User Rating</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-number">10K+</div>
+          <div class="stat-label">Active Users</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="features">
+    <h2 class="section-title">⚡ <span class="highlight">Powerful Features</span></h2>
+    <p class="section-subtitle">Everything you need in a WhatsApp bot</p>
+    
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon"><i class="fas fa-download"></i></div>
+        <h3>Media Downloaders</h3>
+        <p>Download videos and audio from YouTube, TikTok, Instagram, Facebook, Twitter, and 50+ more platforms.</p>
+      </div>
+      
+      <div class="feature-card">
+        <div class="feature-icon"><i class="fas fa-robot"></i></div>
+        <h3>AI Chat</h3>
+        <p>Chat with advanced AI models including GPT-4, Gemini, and Claude for intelligent conversations.</p>
+      </div>
+      
+      <div class="feature-card">
+        <div class="feature-icon"><i class="fas fa-gamepad"></i></div>
+        <h3>Games</h3>
+        <p>Interactive games including trivia, puzzles, word games, RPG elements, and multiplayer fun.</p>
+      </div>
+      
+      <div class="feature-card">
+        <div class="feature-icon"><i class="fas fa-users-cog"></i></div>
+        <h3>Group Management</h3>
+        <p>Auto-moderation, welcome messages, anti-spam, member management, and announcement systems.</p>
+      </div>
+      
+      <div class="feature-card">
+        <div class="feature-icon"><i class="fas fa-tools"></i></div>
+        <h3>Utility Tools</h3>
+        <p>File conversion, QR generation, calculator, currency converter, weather, news, and more.</p>
+      </div>
+      
+      <div class="feature-card">
+        <div class="feature-icon"><i class="fas fa-graduation-cap"></i></div>
+        <h3>Educational Tools</h3>
+        <p>Dictionary, translator, math solver, science facts, historical data, and exam prep materials.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="cta-section">
+      <h2>🚀 Ready to <span class="highlight">Get Started?</span></h2>
+      <p>Connect your WhatsApp device to FEE-XMD and unlock the full power of this advanced bot.</p>
+      <div class="hero-buttons" style="justify-content: center;">
+        <a href="/pair" class="btn btn-primary">
+          <i class="fas fa-link"></i> Pair Now
+        </a>
+        <a href="/qr" class="btn btn-success">
+          <i class="fas fa-qrcode"></i> Scan QR
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <footer class="footer">
+    <div class="social-links">
+      <a href="https://github.com/Fred1e/Fee-Xmd" class="social-link" target="_blank">
+        <i class="fab fa-github"></i> GitHub
+      </a>
+      <a href="https://chat.whatsapp.com/FA1GPSjfUQLCyFbquWnRIS" class="social-link" target="_blank">
+        <i class="fab fa-whatsapp"></i> Group
+      </a>
+      <a href="https://whatsapp.com/channel/0029Vb6mzVF7tkj42VNPrZ3V" class="social-link" target="_blank">
+        <i class="fab fa-whatsapp"></i> Channel
+      </a>
+      <a href="https://instagram.com/frediezra" class="social-link" target="_blank">
+        <i class="fab fa-instagram"></i> Instagram
+      </a>
+    </div>
+    <p>Made with ❤️ by <strong>Fredi AI Tech</strong> | Arusha, Tanzania</p>
+    <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.5rem;">
+      FEE-XMD is not affiliated with WhatsApp Inc.
+    </p>
+  </footer>
+
+  <script>
+    // Mobile Menu
+    const mobileBtn = document.getElementById('mobileMenuBtn');
+    const navLinks = document.getElementById('navLinks');
+    
+    mobileBtn.addEventListener('click', () => {
+      navLinks.classList.toggle('active');
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!navLinks.contains(e.target) && !mobileBtn.contains(e.target)) {
+        navLinks.classList.remove('active');
+      }
+    });
+
+    // Floating Particles
+    function createParticles() {
+      const container = document.getElementById('particles');
+      if (!container) return;
+      
+      for (let i = 0; i < 30; i++) {
+        const particle = document.createElement('div');
+        particle.className = 'particle';
+        const size = Math.random() * 4 + 2;
+        particle.style.cssText = `
+          width: ${size}px;
+          height: ${size}px;
+          left: ${Math.random() * 100}%;
+          animation-duration: ${Math.random() * 20 + 15}s;
+          animation-delay: ${Math.random() * 10}s;
+          opacity: ${Math.random() * 0.3 + 0.1};
+        `;
+        container.appendChild(particle);
+      }
+    }
+
+    // Smooth scroll for nav links
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+      anchor.addEventListener('click', function(e) {
+        const href = this.getAttribute('href');
+        if (href === '#') return;
+        
+        e.preventDefault();
+        const target = document.querySelector(href);
+        if (target) {
+          target.scrollIntoView({ behavior: 'smooth' });
+          navLinks.classList.remove('active');
+        }
+      });
+    });
+
+    // Intersection Observer for features
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.style.opacity = '1';
+          entry.target.style.transform = 'translateY(0)';
+        }
+      });
+    }, { threshold: 0.1 });
+
+    document.querySelectorAll('.feature-card').forEach((card, i) => {
+      card.style.opacity = '0';
+      card.style.transform = 'translateY(30px)';
+      card.style.transition = `all 0.6s ease ${i * 0.1}s`;
+      observer.observe(card);
+    });
+
+    // Initialize
+    document.addEventListener('DOMContentLoaded', createParticles);
+  </script>
+</body>
+</html>

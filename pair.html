@@ -1,0 +1,508 @@
+<!-- pair.html - Updated with interactive design -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FEE-XMD - Pair Device</title>
+  <link rel="icon" type="image/x-icon" href="https://files.catbox.moe/el0qlh.jpeg">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --primary: #7c3aed;
+      --primary-dark: #5b21b6;
+      --secondary: #06b6d4;
+      --accent: #10b981;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+      --background: #0f172a;
+      --surface: #1e293b;
+      --text-primary: #f1f5f9;
+      --text-secondary: #cbd5e1;
+      --text-muted: #94a3b8;
+      --gradient-primary: linear-gradient(135deg, #7c3aed 0%, #06b6d4 100%);
+      --shadow-xl: 0 25px 50px rgba(0,0,0,0.5);
+    }
+
+    body {
+      background: var(--background);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      color: var(--text-primary);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+    }
+
+    .container {
+      max-width: 520px;
+      width: 100%;
+      background: rgba(30, 41, 59, 0.85);
+      backdrop-filter: blur(20px);
+      border-radius: 24px;
+      padding: 2.5rem;
+      border: 1px solid rgba(124, 58, 237, 0.2);
+      box-shadow: var(--shadow-xl);
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+
+    .logo-icon {
+      font-size: 3rem;
+      color: var(--primary);
+      margin-bottom: 0.5rem;
+    }
+
+    .header h1 {
+      font-size: 1.8rem;
+      font-weight: 800;
+      background: var(--gradient-primary);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+
+    .header p {
+      color: var(--text-secondary);
+      font-size: 0.95rem;
+      margin-top: 0.3rem;
+    }
+
+    .input-group {
+      margin-bottom: 1.5rem;
+    }
+
+    .input-label {
+      display: block;
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+      font-weight: 500;
+      margin-bottom: 0.5rem;
+    }
+
+    .input-wrapper {
+      display: flex;
+      gap: 10px;
+      background: rgba(15, 23, 42, 0.8);
+      padding: 4px;
+      border-radius: 14px;
+      border: 1px solid rgba(124, 58, 237, 0.2);
+      transition: all 0.3s ease;
+    }
+
+    .input-wrapper:focus-within {
+      border-color: var(--primary);
+      box-shadow: 0 0 30px rgba(124, 58, 237, 0.15);
+    }
+
+    .phone-input {
+      flex: 1;
+      padding: 1rem 1.2rem;
+      border: none;
+      border-radius: 12px;
+      background: rgba(30, 41, 59, 0.8);
+      color: var(--text-primary);
+      font-size: 1rem;
+      font-weight: 500;
+      outline: none;
+      font-family: inherit;
+    }
+
+    .phone-input::placeholder {
+      color: var(--text-muted);
+      font-weight: 400;
+    }
+
+    .generate-btn {
+      padding: 1rem 1.8rem;
+      background: var(--gradient-primary);
+      color: white;
+      border: none;
+      border-radius: 12px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      white-space: nowrap;
+    }
+
+    .generate-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 30px rgba(124, 58, 237, 0.3);
+    }
+
+    .generate-btn:active {
+      transform: scale(0.97);
+    }
+
+    .loader {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem 0;
+      gap: 1rem;
+    }
+
+    .loader-spinner {
+      width: 50px;
+      height: 50px;
+      border: 3px solid rgba(124, 58, 237, 0.2);
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .loader p {
+      color: var(--text-secondary);
+      font-size: 0.95rem;
+    }
+
+    .result {
+      display: none;
+      animation: slideUp 0.5s ease;
+    }
+
+    @keyframes slideUp {
+      0% { opacity: 0; transform: translateY(20px); }
+      100% { opacity: 1; transform: translateY(0); }
+    }
+
+    .code-display {
+      background: rgba(15, 23, 42, 0.8);
+      border-radius: 14px;
+      padding: 1.5rem;
+      text-align: center;
+      border: 1px solid rgba(124, 58, 237, 0.2);
+    }
+
+    .code-label {
+      color: var(--text-secondary);
+      font-size: 0.85rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .code-value {
+      font-size: 2.2rem;
+      font-weight: 700;
+      letter-spacing: 4px;
+      color: var(--text-primary);
+      font-family: 'Courier New', monospace;
+      padding: 0.5rem;
+      background: rgba(30, 41, 59, 0.5);
+      border-radius: 10px;
+      border: 1px solid rgba(124, 58, 237, 0.1);
+    }
+
+    .code-value .highlight {
+      background: var(--gradient-primary);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+
+    .action-buttons {
+      display: flex;
+      gap: 10px;
+      margin-top: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .action-btn {
+      flex: 1;
+      padding: 0.8rem;
+      border-radius: 10px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      border: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-width: 120px;
+    }
+
+    .action-btn.copy {
+      background: rgba(124, 58, 237, 0.15);
+      color: var(--text-primary);
+      border: 1px solid rgba(124, 58, 237, 0.2);
+    }
+
+    .action-btn.copy:hover {
+      background: rgba(124, 58, 237, 0.25);
+    }
+
+    .action-btn.copy.copied {
+      background: rgba(16, 185, 129, 0.15);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .action-btn.whatsapp {
+      background: rgba(37, 211, 102, 0.15);
+      color: #25D366;
+      border: 1px solid rgba(37, 211, 102, 0.2);
+    }
+
+    .action-btn.whatsapp:hover {
+      background: rgba(37, 211, 102, 0.25);
+    }
+
+    .info-box {
+      margin-top: 1.5rem;
+      padding: 1rem;
+      background: rgba(245, 158, 11, 0.08);
+      border-radius: 12px;
+      border-left: 3px solid var(--warning);
+    }
+
+    .info-box p {
+      color: var(--text-secondary);
+      font-size: 0.85rem;
+      line-height: 1.5;
+    }
+
+    .info-box i {
+      color: var(--warning);
+      margin-right: 6px;
+    }
+
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--text-secondary);
+      text-decoration: none;
+      margin-top: 1.5rem;
+      font-size: 0.9rem;
+      transition: color 0.3s;
+    }
+
+    .back-link:hover {
+      color: white;
+    }
+
+    .features-mini {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 1.5rem;
+    }
+
+    .feature-mini {
+      padding: 0.8rem;
+      background: rgba(15, 23, 42, 0.5);
+      border-radius: 10px;
+      text-align: center;
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+    }
+
+    .feature-mini i {
+      color: var(--primary);
+      margin-right: 6px;
+    }
+
+    @media (max-width: 480px) {
+      .container { padding: 1.5rem; }
+      .input-wrapper { flex-direction: column; }
+      .generate-btn { justify-content: center; }
+      .code-value { font-size: 1.6rem; letter-spacing: 2px; }
+      .action-buttons { flex-direction: column; }
+      .action-btn { min-width: unset; }
+      .features-mini { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="logo-icon"><i class="fas fa-robot"></i></div>
+      <h1>Pair Your Device</h1>
+      <p>Enter your WhatsApp number to generate a secure pairing code</p>
+    </div>
+
+    <div class="input-group">
+      <label class="input-label">
+        <i class="fas fa-mobile-alt"></i> WhatsApp Number
+      </label>
+      <div class="input-wrapper">
+        <input 
+          type="tel" 
+          id="phoneNumber"
+          class="phone-input"
+          placeholder="2557xxxxxxxx"
+          pattern="[0-9]*"
+          inputmode="numeric"
+          maxlength="12"
+        >
+        <button id="generateBtn" class="generate-btn">
+          <i class="fas fa-bolt"></i> Generate
+        </button>
+      </div>
+    </div>
+
+    <div class="loader" id="loader">
+      <div class="loader-spinner"></div>
+      <p>Generating your secure pairing code...</p>
+    </div>
+
+    <div class="result" id="result">
+      <div class="code-display">
+        <div class="code-label">
+          <i class="fas fa-key"></i> Your Pairing Code
+        </div>
+        <div class="code-value">
+          <span class="highlight" id="codeDisplay">------</span>
+        </div>
+        <div class="action-buttons">
+          <button class="action-btn copy" id="copyBtn">
+            <i class="fas fa-copy"></i> Copy Code
+          </button>
+          <button class="action-btn whatsapp" id="whatsappBtn">
+            <i class="fab fa-whatsapp"></i> Send via WhatsApp
+          </button>
+        </div>
+      </div>
+
+      <div class="info-box">
+        <i class="fas fa-shield-alt"></i>
+        <p>This code is valid for <strong>5 minutes</strong> and is for one-time use only. Keep it secure.</p>
+      </div>
+
+      <div class="features-mini">
+        <div class="feature-mini"><i class="fas fa-download"></i> Media Downloaders</div>
+        <div class="feature-mini"><i class="fas fa-robot"></i> AI Chat</div>
+        <div class="feature-mini"><i class="fas fa-gamepad"></i> Games</div>
+        <div class="feature-mini"><i class="fas fa-users-cog"></i> Group Mgmt</div>
+      </div>
+    </div>
+
+    <a href="/" class="back-link">
+      <i class="fas fa-arrow-left"></i> Back to Home
+    </a>
+  </div>
+
+  <script>
+    const phoneInput = document.getElementById('phoneNumber');
+    const generateBtn = document.getElementById('generateBtn');
+    const loader = document.getElementById('loader');
+    const result = document.getElementById('result');
+    const codeDisplay = document.getElementById('codeDisplay');
+    const copyBtn = document.getElementById('copyBtn');
+    const whatsappBtn = document.getElementById('whatsappBtn');
+    let currentCode = '';
+
+    // Format phone input
+    phoneInput.addEventListener('input', () => {
+      let value = phoneInput.value.replace(/[^0-9]/g, '');
+      if (value.startsWith('0')) {
+        value = '255' + value.substring(1);
+      }
+      if (value.length > 12) {
+        value = value.substring(0, 12);
+      }
+      phoneInput.value = value;
+    });
+
+    generateBtn.addEventListener('click', async () => {
+      const number = phoneInput.value.replace(/[^0-9]/g, '');
+      
+      if (number.length < 10) {
+        alert('Please enter a valid WhatsApp number with country code (e.g., 2557xxxxxxxx)');
+        return;
+      }
+
+      // Show loader
+      loader.style.display = 'flex';
+      result.style.display = 'none';
+      generateBtn.disabled = true;
+      generateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating...';
+
+      try {
+        const response = await fetch(`/code?number=${number}`);
+        const data = await response.json();
+
+        if (data.code) {
+          currentCode = data.code;
+          // Format code with spaces every 4 chars
+          const formatted = currentCode.match(/.{1,4}/g).join(' ');
+          codeDisplay.textContent = formatted;
+          
+          loader.style.display = 'none';
+          result.style.display = 'block';
+          result.style.animation = 'none';
+          // Trigger reflow for animation
+          void result.offsetHeight;
+          result.style.animation = 'slideUp 0.5s ease';
+        } else {
+          throw new Error('Invalid response');
+        }
+      } catch (error) {
+        loader.style.display = 'none';
+        alert('Failed to generate code. Please try again.');
+      } finally {
+        generateBtn.disabled = false;
+        generateBtn.innerHTML = '<i class="fas fa-bolt"></i> Generate';
+      }
+    });
+
+    copyBtn.addEventListener('click', async () => {
+      if (!currentCode) return;
+      
+      try {
+        await navigator.clipboard.writeText(currentCode);
+        copyBtn.classList.add('copied');
+        copyBtn.innerHTML = '<i class="fas fa-check"></i> Copied!';
+        setTimeout(() => {
+          copyBtn.classList.remove('copied');
+          copyBtn.innerHTML = '<i class="fas fa-copy"></i> Copy Code';
+        }, 2000);
+      } catch {
+        // Fallback
+        const textarea = document.createElement('textarea');
+        textarea.value = currentCode;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+        copyBtn.classList.add('copied');
+        copyBtn.innerHTML = '<i class="fas fa-check"></i> Copied!';
+        setTimeout(() => {
+          copyBtn.classList.remove('copied');
+          copyBtn.innerHTML = '<i class="fas fa-copy"></i> Copy Code';
+        }, 2000);
+      }
+    });
+
+    whatsappBtn.addEventListener('click', () => {
+      if (!currentCode) return;
+      const number = phoneInput.value.replace(/[^0-9]/g, '');
+      const message = `My FEE-XMD pairing code is: ${currentCode}`;
+      const url = `https://wa.me/${number}?text=${encodeURIComponent(message)}`;
+      window.open(url, '_blank');
+    });
+
+    // Enter key support
+    phoneInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        generateBtn.click();
+      }
+    });
+  </script>
+</body>
+</html>
