@@ -1,67 +1,35 @@
-// qr.js - Fixed with working session generation
+// qr.js - With Pastebin integration
+const PastebinAPI = require('pastebin-js');
+const pastebin = new PastebinAPI('EMWTMkQAVfJa9kM-MRUrxd5Oku1U7pgL');
+const { makeid } = require('./id');
+const QRCode = require('qrcode');
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
-const QRCode = require('qrcode');
+let router = express.Router();
 const pino = require('pino');
-const { makeid } = require('./id');
-
 const {
     default: Fredi,
     useMultiFileAuthState,
-    delay,
-    makeCacheableSignalKeyStore,
+    jidNormalizedUser,
     Browsers,
+    delay,
+    makeInMemoryStore,
     fetchLatestBaileysVersion,
     getContentType
 } = require('@whiskeysockets/baileys');
 
-const router = express.Router();
-let activeSessions = {};
-
-function removeFile(filePath) {
-    if (fs.existsSync(filePath)) {
-        fs.rmSync(filePath, { recursive: true, force: true });
-    }
+function removeFile(FilePath) {
+    if (!fs.existsSync(FilePath)) return false;
+    fs.rmSync(FilePath, {
+        recursive: true,
+        force: true
+    });
 }
 
-// Function to send session without buttons
-async function sendSessionDirect(sock, userJid, sessionId) {
-    try {
-        await sock.sendMessage(userJid, {
-            text: `✅ *DEVICE CONNECTED SUCCESSFULLY!*\n\n📋 *Your Session ID:*\n\n\`\`\`${sessionId}\`\`\`\n\n⚠️ *Save this securely!* It's needed to deploy your bot.`
-        });
+const { readFile } = require('node:fs/promises');
 
-        await delay(2000);
-
-        const infoText = `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮
-┃   🔐 *SESSION INFORMATION*     ┃
-╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
-
-📦 *Session generated successfully!*
-
-• Copy the session ID above
-• Use it to deploy your bot
-• Valid for 24 hours
-
-📌 *Resources:*
-• GitHub: https://github.com/Fred1e/Fee-Xmd
-• Group: https://chat.whatsapp.com/FA1GPSjfUQLCyFbquWnRIS
-• Owner: wa.me/255752593977
-
-🩷 *Thanks for using FEE-XMD!*`;
-
-        await sock.sendMessage(userJid, { text: infoText });
-
-        console.log('✅ Session sent to:', userJid);
-        return true;
-    } catch (error) {
-        console.error('Error sending session:', error);
-        return false;
-    }
-}
-
-// QR Dashboard HTML - simplified
+// QR Dashboard HTML
 const QR_DASHBOARD = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -505,137 +473,128 @@ const QR_DASHBOARD = `<!DOCTYPE html>
 </body>
 </html>`;
 
-// QR Generation endpoint
 router.get('/', async (req, res) => {
     res.send(QR_DASHBOARD);
 });
 
-// QR Generation API
 router.get('/generate', async (req, res) => {
     const id = makeid();
-    const tempDir = path.join(__dirname, 'temp', id);
-    let qrSent = false;
-
-    try {
+    async function FEE_XMD_QR_CODE() {
         const { version } = await fetchLatestBaileysVersion();
-        const { state, saveCreds } = await useMultiFileAuthState(tempDir);
+        const { state, saveCreds } = await useMultiFileAuthState('./temp/' + id);
+        try {
+            let Qr_Code_By_Fredi = Fredi({
+                version,
+                auth: {
+                    creds: state.creds,
+                    keys: makeInMemoryStore(state.keys, pino({ level: 'silent' }).child({ level: 'silent' })),
+                },
+                printQRInTerminal: false,
+                logger: pino({ level: 'silent' }).child({ level: 'silent' }),
+                browser: ['Ubuntu', 'Chrome'],
+                syncFullHistory: false,
+                connectTimeoutMs: 60000,
+                keepAliveIntervalMs: 30000
+            });
 
-        const sock = Fredi({
-            version,
-            logger: pino({ level: 'silent' }).child({ level: 'silent' }),
-            printQRInTerminal: false,
-            auth: {
-                creds: state.creds,
-                keys: makeCacheableSignalKeyStore(state.keys, pino({ level: 'silent' }).child({ level: 'silent' })),
-            },
-            browser: Browsers.ubuntu('Chrome', '125'),
-            syncFullHistory: false,
-            connectTimeoutMs: 60000,
-            keepAliveIntervalMs: 30000,
-            generateHighQualityLinkPreview: true,
-            markOnlineOnConnect: true
-        });
-
-        sock.ev.on('creds.update', saveCreds);
-
-        sock.ev.on('connection.update', async (update) => {
-            const { connection, lastDisconnect, qr } = update;
-
-            if (qr && !qrSent) {
-                qrSent = true;
-                const qrBuffer = await QRCode.toDataURL(qr);
-                res.json({ qr: qrBuffer });
-            }
-
-            if (connection === 'open') {
-                console.log('✅ Device connected via QR!');
-                const userJid = sockInstance.user.id;
-
-                // Send welcome message
-                await sock.sendMessage(userJid, {
-                    text: `👋 *Welcome to FEE-XMD!*\n\nYour device has been connected successfully.\n\n⏳ Generating your session ID... Please wait.`
-                });
-
-                await delay(5000);
-
-                // Read session from file
-                const credsPath = path.join(tempDir, 'creds.json');
-                let sessionData = null;
-                let attempts = 0;
-                const maxAttempts = 15;
-
-                console.log('⏳ Waiting for session file...');
-
-                while (attempts < maxAttempts && !sessionData) {
-                    try {
-                        if (fs.existsSync(credsPath)) {
-                            const data = fs.readFileSync(credsPath);
-                            if (data && data.length > 50) {
-                                sessionData = data;
-                                console.log('✅ Session file found!');
-                                break;
-                            }
-                        }
-                        await delay(2000);
-                        attempts++;
-                    } catch (e) {
-                        await delay(2000);
-                        attempts++;
-                    }
+            Qr_Code_By_Fredi.ev.on('creds.update', saveCreds);
+            Qr_Code_By_Fredi.ev.on('connection.update', async (s) => {
+                const { connection, lastDisconnect, qr } = s;
+                if (qr) {
+                    const qrBuffer = await QRCode.toDataURL(qr);
+                    res.json({ qr: qrBuffer });
                 }
+                if (connection === 'open') {
+                    await Qr_Code_By_Fredi.sendMessage(Qr_Code_By_Fredi.user.id, { text: `
+╭┈┈┈┈━━━━━━┈┈┈┈◈
+┋❒ Hello! 👋 You're now connected to 🄵🄴🄴-🅇🄼🄳.
 
-                if (sessionData) {
-                    const base64Session = Buffer.from(sessionData).toString('base64');
-                    console.log('✅ Session generated, length:', base64Session.length);
+┋❒ Please wait a moment while we generate your session ID. It will be sent shortly... 🙂
+╰┈┈┈┈━━━━━━┈┈┈┈◈
+` });
+                    await delay(5000);
+                    let data = fs.readFileSync(__dirname + `/temp/${id}/creds.json`);
+                    await delay(8000);
+                    let b64data = Buffer.from(data).toString('base64');
+                    
+                    // Send session via WhatsApp
+                    let session = await Qr_Code_By_Fredi.sendMessage(Qr_Code_By_Fredi.user.id, { text: '' + b64data });
 
-                    // Send session directly without buttons
-                    await sendSessionDirect(sock, userJid, base64Session);
+                    // Upload to Pastebin
+                    try {
+                        const pastebinUrl = await pastebin.createPaste({
+                            text: b64data,
+                            title: 'FEE-XMD Session - ' + id,
+                            format: 'text',
+                            privacy: 1 // public
+                        });
+                        console.log('✅ Session uploaded to Pastebin:', pastebinUrl);
+                        
+                        // Send Pastebin link with buttons
+                        await Qr_Code_By_Fredi.sendMessage(Qr_Code_By_Fredi.user.id, {
+                            text: `📋 *Session Backup:*\n${pastebinUrl}\n\n_Keep this link safe!_`
+                        });
+                    } catch (pastebinError) {
+                        console.log('Pastebin upload failed:', pastebinError);
+                    }
+
+                    let FEE_XMD_TEXT = `
+╭━━━★˚☃️˚★━━━╮  
+*🔥 DEVICE CONNECTED SUCCESSFULLY 🔥*  
+╰━━━★˚🩸˚★━━━╯
+
+📦 *𝒚𝒐𝒖𝒓 𝒔𝒆𝒔𝒔𝒊𝒐𝒏 𝒊𝒅 𝒊𝒔 𝒓𝒆𝒂𝒅𝒚!* 
+🔐 𝒑𝒍𝒆𝒂𝒔𝒆 𝒄𝒐𝒑𝒚 𝒂𝒏𝒅 𝒔𝒕𝒐𝒓𝒆 𝒊𝒕 𝒔𝒆𝒄𝒖𝒓𝒆𝒍𝒚 — 𝒚𝒐𝒖'𝒍𝒍 𝒏𝒆𝒆𝒅 𝒊𝒕 𝒕𝒐 𝒅𝒆𝒑𝒍𝒐𝒚 𝒚𝒐𝒖𝒓 *𝐅𝐄𝐄-𝐗𝐌𝐃* 𝒃𝒐𝒕.
+
+🌟 *Let the celebration begin with FEE-XMD power!*
+
+┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+
+📌 *Need Assistance? Reach Out Anytime:*  
+• 👑 *Owner:* https://wa.me/255752593977  
+• 💬 *Group Chat:* https://chat.whatsapp.com/FA1GPSjfUQLCyFbquWnRIS  
+• 📢 *Channel:* https://whatsapp.com/channel/0029Vb6mzVF7tkj42VNPrZ3V  
+• 📸 *Instagram:* https://www.instagram.com/frediezra
+• 👤 *Facebook:* https://www.facebook.com/FrediEzra
+• 🔔 *TikTok:* https://www.tiktok.com/frediezra1
+• 💻 *GitHub Repo:* https://github.com/Fred1e/Fee-Xmd
+
+🧠 *Support FEE-XMD Project:*  
+⭐ Star & 🍴 Fork the repo to stay updated with new features!
+
+🩷 *#Thanks | #FrediAI2026 | #FEEBot*`;
+
+                    await Qr_Code_By_Fredi.sendMessage(Qr_Code_By_Fredi.user.id, { text: FEE_XMD_TEXT }, { quoted: session });
 
                     // Store session for dashboard
                     activeSessions[id] = {
-                        session: base64Session,
-                        user: userJid,
+                        session: b64data,
+                        user: Qr_Code_By_Fredi.user.id,
                         timestamp: Date.now()
                     };
 
-                    console.log('✅ Session sent to:', userJid);
-                } else {
-                    await sock.sendMessage(userJid, {
-                        text: '❌ Failed to generate session. Please try again.'
-                    });
+                    await delay(100);
+                    await Qr_Code_By_Fredi.ws.close();
+                    return await removeFile('./temp/' + id);
+                } else if (connection === 'close' && lastDisconnect && lastDisconnect.error && lastDisconnect.error.output.statusCode != 401) {
+                    await delay(5000); 
+                    FEE_XMD_QR_CODE();
                 }
-
-                await delay(2000);
-                sock.ws.close();
-                removeFile(tempDir);
-
-                setTimeout(function() {
-                    delete activeSessions[id];
-                }, 300000);
+            });
+        } catch (err) {
+            console.log('Service restarted due to error:', err);
+            await removeFile('./temp/' + id);
+            if (!res.headersSent) {
+                await res.json({ code: 'Service is Currently Unavailable' });
             }
-
-            if (connection === 'close' && lastDisconnect?.error?.output?.statusCode !== 401) {
-                console.log('⚠️ Connection closed, reconnecting...');
-                await delay(5000);
-            }
-        });
-
-        setTimeout(function() {
-            if (!qrSent && !res.headersSent) {
-                res.status(408).json({ error: 'QR generation timeout' });
-            }
-        }, 60000);
-
-    } catch (err) {
-        console.error('QR Generation Error:', err);
-        if (!res.headersSent) {
-            res.status(500).json({ error: 'Service unavailable' });
         }
-        removeFile(tempDir);
     }
+    return await FEE_XMD_QR_CODE();
 });
 
 // Status endpoint
+let activeSessions = {};
+
 router.get('/status', async (req, res) => {
     var hasSessions = Object.keys(activeSessions).length > 0;
     res.json({ 
@@ -644,7 +603,6 @@ router.get('/status', async (req, res) => {
     });
 });
 
-// Get session endpoint
 router.get('/getsession', async (req, res) => {
     var sessions = Object.values(activeSessions);
     if (sessions.length > 0) {
