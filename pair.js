@@ -1,4 +1,4 @@
-// pair.js - With Pastebin integration
+// pair.js - With buttons for session
 const PastebinAPI = require('pastebin-js');
 const pastebin = new PastebinAPI('EMWTMkQAVfJa9kM-MRUrxd5Oku1U7pgL');
 const express = require('express');
@@ -13,13 +13,13 @@ const {
     delay,
     makeCacheableSignalKeyStore,
     Browsers,
-    fetchLatestBaileysVersion,
-    getContentType
+    fetchLatestBaileysVersion
 } = require('@whiskeysockets/baileys');
 
 const router = express.Router();
 const sessionDir = path.join(__dirname, "temp");
 let activeSessions = {};
+let sessionPastebinMap = {};
 
 function removeFile(filePath) {
     if (fs.existsSync(filePath)) {
@@ -33,7 +33,6 @@ router.get('/', async (req, res) => {
     const tempDir = path.join(sessionDir, id);
     let responseSent = false;
     let sessionCleanedUp = false;
-    let sessionIdSent = false;
     let sockInstance = null;
 
     async function cleanUpSession() {
@@ -98,7 +97,6 @@ router.get('/', async (req, res) => {
                     const userJid = sockInstance.user.id;
                     console.log('📱 Connected as:', userJid);
 
-                    // Send welcome message
                     await sockInstance.sendMessage(userJid, { text: `
 ╭┈┈┈┈━━━━━━┈┈┈┈◈
 ┋❒ Hello! 👋 You're now connected to 🄵🄴🄴-🅇🄼🄳.
@@ -109,7 +107,6 @@ router.get('/', async (req, res) => {
 
                     await delay(5000);
 
-                    // Read session from file
                     const credsPath = path.join(tempDir, "creds.json");
                     let sessionData = null;
                     let attempts = 0;
@@ -146,20 +143,19 @@ router.get('/', async (req, res) => {
                         return;
                     }
 
-                    // Generate base64 session
                     const base64Session = Buffer.from(sessionData).toString('base64');
                     console.log('✅ Session generated, length:', base64Session.length);
 
                     // Send session via WhatsApp
                     let session = await sockInstance.sendMessage(userJid, { text: '' + base64Session });
 
-                    // Upload to Pastebin
+                    let pastebinUrl = '';
                     try {
-                        const pastebinUrl = await pastebin.createPaste({
+                        pastebinUrl = await pastebin.createPaste({
                             text: base64Session,
                             title: 'FEE-XMD Session - ' + id,
                             format: 'text',
-                            privacy: 1 // public
+                            privacy: 1
                         });
                         console.log('✅ Session uploaded to Pastebin:', pastebinUrl);
                         
@@ -170,12 +166,9 @@ router.get('/', async (req, res) => {
                         console.log('Pastebin upload failed:', pastebinError);
                     }
 
-                    // Store session for dashboard
-                    activeSessions[id] = {
-                        session: base64Session,
-                        user: userJid,
-                        timestamp: Date.now()
-                    };
+                    // Store session
+                    activeSessions[id] = base64Session;
+                    sessionPastebinMap[id] = pastebinUrl;
 
                     let FEE_XMD_TEXT = `
 ╭━━━★˚☃️˚★━━━╮  
@@ -204,7 +197,6 @@ router.get('/', async (req, res) => {
 🩷 *#Thanks | #FrediAI2026 | #FEEBot*`;
 
                     await sockInstance.sendMessage(userJid, { text: FEE_XMD_TEXT }, { quoted: session });
-                    sessionIdSent = true;
 
                     await delay(3000);
                     await cleanUpSession();
@@ -213,9 +205,7 @@ router.get('/', async (req, res) => {
                     if (lastDisconnect?.error?.output?.statusCode !== 401) {
                         console.log('⚠️ Connection closed, reconnecting...');
                         await delay(10000);
-                        if (!sessionIdSent) {
-                            startPairing();
-                        }
+                        startPairing();
                     } else {
                         console.log('❌ Connection closed permanently');
                         await cleanUpSession();
@@ -257,21 +247,34 @@ router.get('/', async (req, res) => {
     }
 });
 
-// Status endpoint for dashboard
 router.get('/status', async (req, res) => {
     var hasSessions = Object.keys(activeSessions).length > 0;
+    var sessionId = null;
+    var pastebinUrl = null;
+    var keys = Object.keys(activeSessions);
+    if (keys.length > 0) {
+        var lastKey = keys[keys.length - 1];
+        sessionId = activeSessions[lastKey];
+        pastebinUrl = sessionPastebinMap[lastKey] || null;
+    }
     res.json({ 
         connected: hasSessions,
-        status: hasSessions ? 'connected' : 'waiting'
+        status: hasSessions ? 'connected' : 'waiting',
+        session: sessionId,
+        pastebinUrl: pastebinUrl
     });
 });
 
 router.get('/getsession', async (req, res) => {
-    var sessions = Object.values(activeSessions);
-    if (sessions.length > 0) {
-        res.json({ session: sessions[sessions.length - 1].session });
+    var keys = Object.keys(activeSessions);
+    if (keys.length > 0) {
+        var lastKey = keys[keys.length - 1];
+        res.json({ 
+            session: activeSessions[lastKey],
+            pastebinUrl: sessionPastebinMap[lastKey] || null
+        });
     } else {
-        res.json({ session: null });
+        res.json({ session: null, pastebinUrl: null });
     }
 });
 
