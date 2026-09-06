@@ -1,8 +1,8 @@
-
+// package.json
 {
   "name": "fee-xmd-bot",
   "version": "2.0.0",
-  "description": "FEE XMD WhatsApp Bot with Advanced Pairing System",
+  "description": "FEE XMD WhatsApp Bot",
   "main": "fredi.js",
   "engines": {
     "npm": ">=9.7.2",
