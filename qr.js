@@ -1,4 +1,4 @@
-// qr.js - With Pastebin integration
+// qr.js - Working QR with session generation
 const PastebinAPI = require('pastebin-js');
 const pastebin = new PastebinAPI('EMWTMkQAVfJa9kM-MRUrxd5Oku1U7pgL');
 const { makeid } = require('./id');
@@ -15,19 +15,16 @@ const {
     Browsers,
     delay,
     makeInMemoryStore,
-    fetchLatestBaileysVersion,
-    getContentType
+    fetchLatestBaileysVersion
 } = require('@whiskeysockets/baileys');
 
 function removeFile(FilePath) {
-    if (!fs.existsSync(FilePath)) return false;
+    if (fs.existsSync(FilePath)) return false;
     fs.rmSync(FilePath, {
         recursive: true,
         force: true
     });
 }
-
-const { readFile } = require('node:fs/promises');
 
 // QR Dashboard HTML
 const QR_DASHBOARD = `<!DOCTYPE html>
@@ -181,6 +178,8 @@ const QR_DASHBOARD = `<!DOCTYPE html>
         .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(124,58,237,0.4); }
         .btn-secondary { background: rgba(124,58,237,0.1); color: #f1f5f9; border: 1px solid rgba(124,58,237,0.2); }
         .btn-secondary:hover { background: rgba(124,58,237,0.2); transform: translateY(-2px); }
+        .btn-success { background: linear-gradient(135deg, #10b981, #06b6d4); color: white; }
+        .btn-success:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(16,185,129,0.4); }
         .steps-list { list-style: none; padding: 0; }
         .steps-list li {
             padding: 0.8rem 1rem;
@@ -250,6 +249,11 @@ const QR_DASHBOARD = `<!DOCTYPE html>
             .qr-container { min-height: 280px; padding: 1rem; }
             #qrImage { max-width: 200px; }
         }
+        .copy-success {
+            background: rgba(16,185,129,0.2);
+            border-color: #10b981 !important;
+            color: #10b981 !important;
+        }
     </style>
 </head>
 <body>
@@ -315,8 +319,9 @@ const QR_DASHBOARD = `<!DOCTYPE html>
                 <div class="label">📋 Your Session ID (Copy for deployment)</div>
                 <div class="code" id="sessionCode">Loading...</div>
                 <div class="actions">
-                    <button onclick="copySession()" class="btn btn-primary"><i class="fas fa-copy"></i> Copy</button>
-                    <button onclick="downloadSession()" class="btn btn-secondary"><i class="fas fa-download"></i> Download</button>
+                    <button onclick="copySession()" class="btn btn-success"><i class="fas fa-copy"></i> Copy Session</button>
+                    <button onclick="downloadSession()" class="btn btn-primary"><i class="fas fa-download"></i> Download</button>
+                    <button onclick="openPastebin()" class="btn btn-secondary"><i class="fas fa-link"></i> Open Backup</button>
                     <button onclick="clearSession()" class="btn btn-secondary"><i class="fas fa-trash"></i> Clear</button>
                 </div>
             </div>
@@ -336,6 +341,7 @@ const QR_DASHBOARD = `<!DOCTYPE html>
         var qrRefreshInterval = null;
         var statusCheckInterval = null;
         var currentSessionId = '';
+        var currentPastebinUrl = '';
         var sessionReceived = false;
 
         function updateStatus(type, message, icon) {
@@ -354,8 +360,9 @@ const QR_DASHBOARD = `<!DOCTYPE html>
             badge.innerHTML = '<i class="fas ' + icon + '"></i><span>' + text + '</span>';
         }
 
-        function displaySession(sessionId) {
+        function displaySession(sessionId, pastebinUrl) {
             currentSessionId = sessionId;
+            currentPastebinUrl = pastebinUrl || '';
             var sessionBox = document.getElementById('sessionBox');
             var noSession = document.getElementById('noSession');
             sessionBox.classList.add('active');
@@ -397,7 +404,7 @@ const QR_DASHBOARD = `<!DOCTYPE html>
                     if (qrRefreshInterval) { clearInterval(qrRefreshInterval); qrRefreshInterval = null; }
                     checkSession();
                 }
-                if (data.session) { displaySession(data.session); }
+                if (data.session) { displaySession(data.session, data.pastebinUrl); }
             } catch (error) {}
         }
 
@@ -405,13 +412,14 @@ const QR_DASHBOARD = `<!DOCTYPE html>
             try {
                 var response = await fetch('/qr/getsession');
                 var data = await response.json();
-                if (data.session) { displaySession(data.session); }
+                if (data.session) { displaySession(data.session, data.pastebinUrl); }
             } catch (error) {}
         }
 
         function refreshQR() {
             sessionReceived = false;
             currentSessionId = '';
+            currentPastebinUrl = '';
             document.getElementById('qrImage').style.display = 'none';
             document.getElementById('qrPlaceholder').style.display = 'block';
             document.getElementById('sessionBox').classList.remove('active');
@@ -428,11 +436,14 @@ const QR_DASHBOARD = `<!DOCTYPE html>
         function copySession() {
             if (!currentSessionId) return;
             navigator.clipboard.writeText(currentSessionId).then(function() {
-                var btns = document.querySelectorAll('.session-box .actions .btn');
-                var btn = btns[0];
+                var btn = document.querySelector('.session-box .actions .btn-success');
                 var original = btn.innerHTML;
                 btn.innerHTML = '<i class="fas fa-check"></i> Copied!';
-                setTimeout(function() { btn.innerHTML = original; }, 2000);
+                btn.classList.add('copy-success');
+                setTimeout(function() {
+                    btn.innerHTML = original;
+                    btn.classList.remove('copy-success');
+                }, 3000);
             }).catch(function() {
                 var textarea = document.createElement('textarea');
                 textarea.value = currentSessionId;
@@ -440,7 +451,10 @@ const QR_DASHBOARD = `<!DOCTYPE html>
                 textarea.select();
                 document.execCommand('copy');
                 document.body.removeChild(textarea);
-                alert('Copied!');
+                var btn = document.querySelector('.session-box .actions .btn-success');
+                var original = btn.innerHTML;
+                btn.innerHTML = '<i class="fas fa-check"></i> Copied!';
+                setTimeout(function() { btn.innerHTML = original; }, 3000);
             });
         }
 
@@ -457,8 +471,17 @@ const QR_DASHBOARD = `<!DOCTYPE html>
             URL.revokeObjectURL(url);
         }
 
+        function openPastebin() {
+            if (currentPastebinUrl) {
+                window.open(currentPastebinUrl, '_blank');
+            } else {
+                alert('No Pastebin backup available. Session was not uploaded to Pastebin.');
+            }
+        }
+
         function clearSession() {
             currentSessionId = '';
+            currentPastebinUrl = '';
             document.getElementById('sessionBox').classList.remove('active');
             document.getElementById('noSession').style.display = 'block';
             sessionReceived = false;
@@ -476,6 +499,10 @@ const QR_DASHBOARD = `<!DOCTYPE html>
 router.get('/', async (req, res) => {
     res.send(QR_DASHBOARD);
 });
+
+// Store sessions
+let activeSessions = {};
+let sessionPastebinMap = {};
 
 router.get('/generate', async (req, res) => {
     const id = makeid();
@@ -505,6 +532,8 @@ router.get('/generate', async (req, res) => {
                     res.json({ qr: qrBuffer });
                 }
                 if (connection === 'open') {
+                    console.log('✅ Device connected via QR!');
+                    
                     await Qr_Code_By_Fredi.sendMessage(Qr_Code_By_Fredi.user.id, { text: `
 ╭┈┈┈┈━━━━━━┈┈┈┈◈
 ┋❒ Hello! 👋 You're now connected to 🄵🄴🄴-🅇🄼🄳.
@@ -512,21 +541,23 @@ router.get('/generate', async (req, res) => {
 ┋❒ Please wait a moment while we generate your session ID. It will be sent shortly... 🙂
 ╰┈┈┈┈━━━━━━┈┈┈┈◈
 ` });
+                    
                     await delay(5000);
+                    
                     let data = fs.readFileSync(__dirname + `/temp/${id}/creds.json`);
                     await delay(8000);
                     let b64data = Buffer.from(data).toString('base64');
                     
                     // Send session via WhatsApp
                     let session = await Qr_Code_By_Fredi.sendMessage(Qr_Code_By_Fredi.user.id, { text: '' + b64data });
-
-                    // Upload to Pastebin
+                    
+                    let pastebinUrl = '';
                     try {
-                        const pastebinUrl = await pastebin.createPaste({
+                        pastebinUrl = await pastebin.createPaste({
                             text: b64data,
                             title: 'FEE-XMD Session - ' + id,
                             format: 'text',
-                            privacy: 1 // public
+                            privacy: 1
                         });
                         console.log('✅ Session uploaded to Pastebin:', pastebinUrl);
                         
@@ -567,11 +598,8 @@ router.get('/generate', async (req, res) => {
                     await Qr_Code_By_Fredi.sendMessage(Qr_Code_By_Fredi.user.id, { text: FEE_XMD_TEXT }, { quoted: session });
 
                     // Store session for dashboard
-                    activeSessions[id] = {
-                        session: b64data,
-                        user: Qr_Code_By_Fredi.user.id,
-                        timestamp: Date.now()
-                    };
+                    activeSessions[id] = b64data;
+                    sessionPastebinMap[id] = pastebinUrl;
 
                     await delay(100);
                     await Qr_Code_By_Fredi.ws.close();
@@ -592,23 +620,34 @@ router.get('/generate', async (req, res) => {
     return await FEE_XMD_QR_CODE();
 });
 
-// Status endpoint
-let activeSessions = {};
-
 router.get('/status', async (req, res) => {
     var hasSessions = Object.keys(activeSessions).length > 0;
+    var sessionId = null;
+    var pastebinUrl = null;
+    var keys = Object.keys(activeSessions);
+    if (keys.length > 0) {
+        var lastKey = keys[keys.length - 1];
+        sessionId = activeSessions[lastKey];
+        pastebinUrl = sessionPastebinMap[lastKey] || null;
+    }
     res.json({ 
         connected: hasSessions,
-        status: hasSessions ? 'connected' : 'waiting'
+        status: hasSessions ? 'connected' : 'waiting',
+        session: sessionId,
+        pastebinUrl: pastebinUrl
     });
 });
 
 router.get('/getsession', async (req, res) => {
-    var sessions = Object.values(activeSessions);
-    if (sessions.length > 0) {
-        res.json({ session: sessions[sessions.length - 1].session });
+    var keys = Object.keys(activeSessions);
+    if (keys.length > 0) {
+        var lastKey = keys[keys.length - 1];
+        res.json({ 
+            session: activeSessions[lastKey],
+            pastebinUrl: sessionPastebinMap[lastKey] || null
+        });
     } else {
-        res.json({ session: null });
+        res.json({ session: null, pastebinUrl: null });
     }
 });
 
