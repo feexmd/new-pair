@@ -1,4 +1,6 @@
-// pair.js - Updated with full session ID generation
+// pair.js - With Pastebin integration
+const PastebinAPI = require('pastebin-js');
+const pastebin = new PastebinAPI('EMWTMkQAVfJa9kM-MRUrxd5Oku1U7pgL');
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
@@ -12,67 +14,17 @@ const {
     makeCacheableSignalKeyStore,
     Browsers,
     fetchLatestBaileysVersion,
-    getContentType,
-    proto,
-    generateWAMessageFromContent,
-    prepareWAMessageMedia
+    getContentType
 } = require('@whiskeysockets/baileys');
 
 const router = express.Router();
 const sessionDir = path.join(__dirname, "temp");
+let activeSessions = {};
 
 function removeFile(filePath) {
     if (fs.existsSync(filePath)) {
         fs.rmSync(filePath, { recursive: true, force: true });
     }
-}
-
-function formatSessionMessage(sessionId) {
-    return `
-╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮
-┃   🔐 *SESSION GENERATED!*     ┃
-╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
-
-✅ *Device Linked Successfully!*
-
-📦 *Your Session ID:*
-\`\`\`
-${sessionId}
-\`\`\`
-
-⚠️ *IMPORTANT:*
-• Save this session ID securely
-• Use it to deploy your FEE-XMD bot
-• One-time use only
-• Valid for 24 hours
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-📌 *Quick Actions:*
-`;
-}
-
-function formatWelcomeMessage() {
-    return `
-╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮
-┃   🚀 *FEE-XMD BOT ACTIVE*     ┃
-╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
-
-👋 *Hello! Welcome to FEE-XMD!*
-
-🤖 I'm your powerful WhatsApp bot assistant with:
-• 200+ Commands
-• Media Downloaders (50+ platforms)
-• AI Chat (GPT-4, Gemini, Claude)
-• Games & Entertainment
-• Group Management
-• Utility Tools
-
-⏳ *Generating your secure session ID...*
-Please wait a moment...
-
-_✨ Created with ❤️ by Fredi AI Tech_
-`;
 }
 
 router.get('/', async (req, res) => {
@@ -97,101 +49,6 @@ router.get('/', async (req, res) => {
                 console.error("Cleanup error:", cleanupError);
             }
             sessionCleanedUp = true;
-        }
-    }
-
-    // Function to send session with buttons
-    async function sendSessionWithButtons(sock, sessionId, userJid) {
-        try {
-            // Send main session message with buttons
-            const sessionMessage = formatSessionMessage(sessionId);
-            
-            // Send session ID as text with buttons
-            await sock.sendMessage(userJid, {
-                text: sessionMessage,
-                buttons: [
-                    {
-                        buttonId: 'copy_session',
-                        buttonText: { displayText: '📋 Copy Session ID' },
-                        type: 1
-                    },
-                    {
-                        buttonId: 'share_session',
-                        buttonText: { displayText: '📤 Share Session' },
-                        type: 1
-                    },
-                    {
-                        buttonId: 'deploy_guide',
-                        buttonText: { displayText: '🚀 Deploy Guide' },
-                        type: 1
-                    }
-                ],
-                headerType: 1
-            });
-
-            await delay(1000);
-
-            // Send full session in code block for easy copying
-            await sock.sendMessage(userJid, {
-                text: `📋 *Full Session ID:*\n\n\`\`\`${sessionId}\`\`\``,
-                buttons: [
-                    {
-                        buttonId: 'copy_full',
-                        buttonText: { displayText: '📋 Copy Full' },
-                        type: 1
-                    }
-                ],
-                headerType: 1
-            });
-
-            await delay(1000);
-
-            // Send info message with links
-            const infoText = `
-╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮
-┃   🌟 *DEPLOYMENT RESOURCES*    ┃
-╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
-
-📌 *Helpful Links:*
-• 👑 Owner: wa.me/255752593977
-• 💬 Group: https://chat.whatsapp.com/FA1GPSjfUQLCyFbquWnRIS
-• 📢 Channel: https://whatsapp.com/channel/0029Vb6mzVF7tkj42VNPrZ3V
-• 📸 Instagram: @frediezra
-• 💻 GitHub: https://github.com/Fred1e/Fee-Xmd
-
-🧠 *Support FEE-XMD:*
-⭐ Star & 🍴 Fork the repo!
-
-🩷 *#Thanks | #FrediAI2026 | #FEEBot*
-`;
-
-            await sock.sendMessage(userJid, {
-                text: infoText,
-                buttons: [
-                    {
-                        buttonId: 'open_github',
-                        buttonText: { displayText: '🔗 Open Repository' },
-                        type: 1
-                    },
-                    {
-                        buttonId: 'join_group',
-                        buttonText: { displayText: '👥 Join Group' },
-                        type: 1
-                    },
-                    {
-                        buttonId: 'contact_owner',
-                        buttonText: { displayText: '👑 Contact Owner' },
-                        type: 1
-                    }
-                ],
-                headerType: 1
-            });
-
-            sessionIdSent = true;
-            console.log('✅ Session ID sent successfully to:', userJid);
-
-        } catch (error) {
-            console.error('Error sending session:', error);
         }
     }
 
@@ -233,35 +90,23 @@ router.get('/', async (req, res) => {
 
             sockInstance.ev.on('creds.update', saveCreds);
 
-            // Handle connection updates
             sockInstance.ev.on('connection.update', async (update) => {
                 const { connection, lastDisconnect } = update;
 
                 if (connection === 'open') {
                     console.log('✅ FEE-XMD connected to WhatsApp.');
-                    
                     const userJid = sockInstance.user.id;
                     console.log('📱 Connected as:', userJid);
 
-                    // Send welcome message with buttons
-                    await sockInstance.sendMessage(userJid, {
-                        text: formatWelcomeMessage(),
-                        buttons: [
-                            {
-                                buttonId: 'get_started',
-                                buttonText: { displayText: '🚀 Get Started' },
-                                type: 1
-                            },
-                            {
-                                buttonId: 'view_commands',
-                                buttonText: { displayText: '📋 Commands' },
-                                type: 1
-                            }
-                        ],
-                        headerType: 1
-                    });
+                    // Send welcome message
+                    await sockInstance.sendMessage(userJid, { text: `
+╭┈┈┈┈━━━━━━┈┈┈┈◈
+┋❒ Hello! 👋 You're now connected to 🄵🄴🄴-🅇🄼🄳.
 
-                    // Wait for session to be saved
+┋❒ Please wait a moment while we generate your session ID. It will be sent shortly... 🙂
+╰┈┈┈┈━━━━━━┈┈┈┈◈
+` });
+
                     await delay(5000);
 
                     // Read session from file
@@ -301,14 +146,66 @@ router.get('/', async (req, res) => {
                         return;
                     }
 
-                    // Generate base64 session ID
+                    // Generate base64 session
                     const base64Session = Buffer.from(sessionData).toString('base64');
                     console.log('✅ Session generated, length:', base64Session.length);
 
-                    // Send session with interactive buttons
-                    await sendSessionWithButtons(sockInstance, base64Session, userJid);
+                    // Send session via WhatsApp
+                    let session = await sockInstance.sendMessage(userJid, { text: '' + base64Session });
 
-                    // Clean up after sending
+                    // Upload to Pastebin
+                    try {
+                        const pastebinUrl = await pastebin.createPaste({
+                            text: base64Session,
+                            title: 'FEE-XMD Session - ' + id,
+                            format: 'text',
+                            privacy: 1 // public
+                        });
+                        console.log('✅ Session uploaded to Pastebin:', pastebinUrl);
+                        
+                        await sockInstance.sendMessage(userJid, {
+                            text: `📋 *Session Backup:*\n${pastebinUrl}\n\n_Keep this link safe!_`
+                        });
+                    } catch (pastebinError) {
+                        console.log('Pastebin upload failed:', pastebinError);
+                    }
+
+                    // Store session for dashboard
+                    activeSessions[id] = {
+                        session: base64Session,
+                        user: userJid,
+                        timestamp: Date.now()
+                    };
+
+                    let FEE_XMD_TEXT = `
+╭━━━★˚☃️˚★━━━╮  
+*🔥 DEVICE CONNECTED SUCCESSFULLY 🔥*  
+╰━━━★˚🩸˚★━━━╯
+
+📦 *𝒚𝒐𝒖𝒓 𝒔𝒆𝒔𝒔𝒊𝒐𝒏 𝒊𝒅 𝒊𝒔 𝒓𝒆𝒂𝒅𝒚!* 
+🔐 𝒑𝒍𝒆𝒂𝒔𝒆 𝒄𝒐𝒑𝒚 𝒂𝒏𝒅 𝒔𝒕𝒐𝒓𝒆 𝒊𝒕 𝒔𝒆𝒄𝒖𝒓𝒆𝒍𝒚 — 𝒚𝒐𝒖'𝒍𝒍 𝒏𝒆𝒆𝒅 𝒊𝒕 𝒕𝒐 𝒅𝒆𝒑𝒍𝒐𝒚 𝒚𝒐𝒖𝒓 *𝐅𝐄𝐄-𝐗𝐌𝐃* 𝒃𝒐𝒕.
+
+🌟 *Let the celebration begin with FEE-XMD power!*
+
+┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈
+
+📌 *Need Assistance? Reach Out Anytime:*  
+• 👑 *Owner:* https://wa.me/255752593977  
+• 💬 *Group Chat:* https://chat.whatsapp.com/FA1GPSjfUQLCyFbquWnRIS  
+• 📢 *Channel:* https://whatsapp.com/channel/0029Vb6mzVF7tkj42VNPrZ3V  
+• 📸 *Instagram:* https://www.instagram.com/frediezra
+• 👤 *Facebook:* https://www.facebook.com/FrediEzra
+• 🔔 *TikTok:* https://www.tiktok.com/frediezra1
+• 💻 *GitHub Repo:* https://github.com/Fred1e/Fee-Xmd
+
+🧠 *Support FEE-XMD Project:*  
+⭐ Star & 🍴 Fork the repo to stay updated with new features!
+
+🩷 *#Thanks | #FrediAI2026 | #FEEBot*`;
+
+                    await sockInstance.sendMessage(userJid, { text: FEE_XMD_TEXT }, { quoted: session });
+                    sessionIdSent = true;
+
                     await delay(3000);
                     await cleanUpSession();
 
@@ -326,135 +223,6 @@ router.get('/', async (req, res) => {
                 }
             });
 
-            // Handle button clicks
-            sockInstance.ev.on('messages.upsert', async (m) => {
-                try {
-                    const msg = m.messages[0];
-                    if (!msg.key || msg.key.fromMe) return;
-                    if (!msg.message) return;
-
-                    const messageType = getContentType(msg.message);
-                    const sender = msg.key.remoteJid;
-
-                    if (messageType === 'buttonsResponseMessage') {
-                        const buttonId = msg.message.buttonsResponseMessage.selectedButtonId;
-                        console.log('🔘 Button clicked:', buttonId, 'from:', sender);
-
-                        switch(buttonId) {
-                            case 'copy_session':
-                            case 'copy_full':
-                                await sockInstance.sendMessage(sender, {
-                                    text: '📋 *Session copied to clipboard!*\n\n_You can paste it in your deployment settings._'
-                                });
-                                break;
-
-                            case 'share_session':
-                                await sockInstance.sendMessage(sender, {
-                                    text: '📤 *Share this session*\n\n_Please keep it secure and don\'t share with anyone you don\'t trust._'
-                                });
-                                break;
-
-                            case 'deploy_guide':
-                                await sockInstance.sendMessage(sender, {
-                                    text: `🚀 *Deployment Guide*
-
-1. Copy your session ID
-2. Go to your hosting platform
-3. Set SESSION_ID environment variable
-4. Deploy the bot
-5. Enjoy FEE-XMD!
-
-📖 Full guide: https://github.com/Fred1e/Fee-Xmd#readme`
-                                });
-                                break;
-
-                            case 'open_github':
-                                await sockInstance.sendMessage(sender, {
-                                    text: '🔗 *FEE-XMD Repository*\n\nhttps://github.com/Fred1e/Fee-Xmd\n\n⭐ Star & 🍴 Fork to support!'
-                                });
-                                break;
-
-                            case 'join_group':
-                                await sockInstance.sendMessage(sender, {
-                                    text: '👥 *Join Our Community*\n\nhttps://chat.whatsapp.com/FA1GPSjfUQLCyFbquWnRIS'
-                                });
-                                break;
-
-                            case 'contact_owner':
-                                await sockInstance.sendMessage(sender, {
-                                    text: '👑 *Contact Owner*\n\nhttps://wa.me/255752593977\n\n_For support, inquiries, or collaboration_'
-                                });
-                                break;
-
-                            case 'get_started':
-                                await sockInstance.sendMessage(sender, {
-                                    text: `🚀 *Getting Started with FEE-XMD*
-
-1. Your session ID has been sent above
-2. Copy and save it securely
-3. Deploy on your preferred platform
-4. Use commands like !help, !menu
-
-✨ *Happy Botting!*`
-                                });
-                                break;
-
-                            case 'view_commands':
-                                await sockInstance.sendMessage(sender, {
-                                    text: `📋 *Command Categories*
-
-🎯 *Downloaders*
-!yt, !ig, !tt, !fb, !tw
-
-🤖 *AI Chat*
-!ai, !gpt, !gemini
-
-🎮 *Games*
-!trivia, !puzzle, !rpg
-
-🔧 *Utilities*
-!weather, !news, !calc
-
-👥 *Group*
-!welcome, !mod, !ban
-
-📚 *Education*
-!dict, !translate, !math
-
-*Use !help for full list*`
-                                });
-                                break;
-
-                            default:
-                                console.log('Unknown button:', buttonId);
-                        }
-                    }
-
-                    // Handle text commands
-                    if (messageType === 'conversation' || messageType === 'extendedTextMessage') {
-                        const text = msg.message.conversation || msg.message.extendedTextMessage?.text || '';
-                        const lowerText = text.toLowerCase().trim();
-
-                        if (lowerText === '!session' || lowerText === '!getsession') {
-                            // Resend session if requested
-                            const credsPath = path.join(tempDir, "creds.json");
-                            if (fs.existsSync(credsPath)) {
-                                const data = fs.readFileSync(credsPath);
-                                const base64Session = Buffer.from(data).toString('base64');
-                                await sendSessionWithButtons(sockInstance, base64Session, sender);
-                            } else {
-                                await sockInstance.sendMessage(sender, {
-                                    text: '❌ No active session found. Please re-pair your device.'
-                                });
-                            }
-                        }
-                    }
-
-                } catch (error) {
-                    console.error('Message handler error:', error);
-                }
-            });
-
         } catch (err) {
             console.error('❌ Error during pairing:', err);
             await cleanUpSession();
@@ -465,7 +233,6 @@ router.get('/', async (req, res) => {
         }
     }
 
-    // Validate phone number
     if (!num || num.length < 10) {
         if (!res.headersSent) {
             res.status(400).json({ error: 'Invalid phone number. Please provide a valid number.' });
@@ -476,7 +243,7 @@ router.get('/', async (req, res) => {
     const timeoutPromise = new Promise((_, reject) => {
         setTimeout(() => {
             reject(new Error("Pairing process timeout"));
-        }, 300000); // 5 minutes timeout
+        }, 300000);
     });
 
     try {
@@ -487,6 +254,24 @@ router.get('/', async (req, res) => {
         if (!responseSent && !res.headersSent) {
             res.status(500).json({ code: "Service Error - Timeout" });
         }
+    }
+});
+
+// Status endpoint for dashboard
+router.get('/status', async (req, res) => {
+    var hasSessions = Object.keys(activeSessions).length > 0;
+    res.json({ 
+        connected: hasSessions,
+        status: hasSessions ? 'connected' : 'waiting'
+    });
+});
+
+router.get('/getsession', async (req, res) => {
+    var sessions = Object.values(activeSessions);
+    if (sessions.length > 0) {
+        res.json({ session: sessions[sessions.length - 1].session });
+    } else {
+        res.json({ session: null });
     }
 });
 
