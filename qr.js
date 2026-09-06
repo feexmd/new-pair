@@ -1,4 +1,4 @@
-// qr.js - Updated QR dashboard with interactive UI
+// qr.js - Updated QR dashboard with full session generation
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
@@ -17,6 +17,7 @@ const {
 } = require('@whiskeysockets/baileys');
 
 const router = express.Router();
+let activeSessions = {};
 
 function removeFile(filePath) {
     if (fs.existsSync(filePath)) {
@@ -24,7 +25,32 @@ function removeFile(filePath) {
     }
 }
 
-// QR Dashboard HTML
+function formatSessionMessage(sessionId) {
+    return `
+╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮
+┃   🔐 *SESSION GENERATED!*     ┃
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
+
+✅ *Device Linked Successfully!*
+
+📦 *Your Session ID:*
+\`\`\`
+${sessionId}
+\`\`\`
+
+⚠️ *IMPORTANT:*
+• Save this session ID securely
+• Use it to deploy your FEE-XMD bot
+• One-time use only
+• Valid for 24 hours
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📌 *Quick Actions:*
+`;
+}
+
+// QR Dashboard HTML with enhanced UI
 const QR_DASHBOARD = `
 <!DOCTYPE html>
 <html lang="en">
@@ -48,7 +74,9 @@ const QR_DASHBOARD = `
             --surface: #1e293b;
             --text-primary: #f1f5f9;
             --text-secondary: #cbd5e1;
+            --text-muted: #94a3b8;
             --gradient-primary: linear-gradient(135deg, #7c3aed 0%, #06b6d4 100%);
+            --gradient-success: linear-gradient(135deg, #10b981 0%, #06b6d4 100%);
             --shadow-xl: 0 25px 50px rgba(0,0,0,0.5);
         }
 
@@ -101,6 +129,7 @@ const QR_DASHBOARD = `
             transition: color 0.3s;
             padding: 0.5rem 1rem;
             border-radius: 8px;
+            font-size: 0.95rem;
         }
 
         .nav-links a:hover {
@@ -116,25 +145,59 @@ const QR_DASHBOARD = `
 
         .hero-section {
             text-align: center;
-            padding: 3rem 0;
+            padding: 2rem 0 3rem;
             position: relative;
         }
 
         .hero-title {
-            font-size: 3rem;
+            font-size: 2.8rem;
             font-weight: 800;
             background: var(--gradient-primary);
             -webkit-background-clip: text;
             background-clip: text;
             color: transparent;
-            margin-bottom: 1rem;
+            margin-bottom: 0.5rem;
         }
 
         .hero-subtitle {
             color: var(--text-secondary);
-            font-size: 1.2rem;
+            font-size: 1.1rem;
             max-width: 600px;
-            margin: 0 auto 2rem;
+            margin: 0 auto 1.5rem;
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 0.5rem 1.2rem;
+            border-radius: 50px;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        .status-badge.waiting {
+            background: rgba(245, 158, 11, 0.15);
+            color: var(--warning);
+            border: 1px solid rgba(245, 158, 11, 0.3);
+        }
+
+        .status-badge.connecting {
+            background: rgba(6, 182, 212, 0.15);
+            color: var(--secondary);
+            border: 1px solid rgba(6, 182, 212, 0.3);
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        .status-badge.connected {
+            background: rgba(16, 185, 129, 0.15);
+            color: var(--accent);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
         }
 
         .dashboard-grid {
@@ -166,9 +229,9 @@ const QR_DASHBOARD = `
         }
 
         .card-title {
-            font-size: 1.3rem;
+            font-size: 1.2rem;
             font-weight: 600;
-            margin-bottom: 1rem;
+            margin-bottom: 1.2rem;
             display: flex;
             align-items: center;
             gap: 10px;
@@ -182,64 +245,162 @@ const QR_DASHBOARD = `
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            padding: 2rem;
+            padding: 2rem 1rem;
             background: rgba(15, 23, 42, 0.6);
             border-radius: 16px;
-            min-height: 400px;
+            min-height: 350px;
+            position: relative;
         }
 
         #qrImage {
-            max-width: 300px;
+            max-width: 280px;
             width: 100%;
             border-radius: 12px;
             box-shadow: 0 0 40px rgba(124, 58, 237, 0.3);
             border: 2px solid rgba(124, 58, 237, 0.3);
+            transition: all 0.5s ease;
         }
 
-        .qr-status {
-            margin-top: 1.5rem;
-            padding: 0.8rem 1.5rem;
-            border-radius: 12px;
-            font-weight: 500;
+        #qrImage.connected {
+            border-color: var(--accent);
+            box-shadow: 0 0 60px rgba(16, 185, 129, 0.3);
         }
 
-        .status-waiting {
-            background: rgba(245, 158, 11, 0.2);
-            color: var(--warning);
-            border: 1px solid rgba(245, 158, 11, 0.3);
+        .qr-placeholder {
+            text-align: center;
+            padding: 2rem;
         }
 
-        .status-connecting {
-            background: rgba(6, 182, 212, 0.2);
-            color: var(--secondary);
-            border: 1px solid rgba(6, 182, 212, 0.3);
-            animation: pulse 1.5s ease-in-out infinite;
+        .qr-placeholder i {
+            font-size: 3rem;
+            color: var(--primary);
+            animation: spin 2s linear infinite;
         }
 
-        .status-connected {
-            background: rgba(16, 185, 129, 0.2);
-            color: var(--accent);
-            border: 1px solid rgba(16, 185, 129, 0.3);
+        .qr-placeholder p {
+            color: var(--text-secondary);
+            margin-top: 1rem;
         }
 
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.6; }
-        }
-
-        .spinner {
-            display: inline-block;
-            width: 20px;
-            height: 20px;
-            border: 3px solid rgba(124, 58, 237, 0.3);
-            border-top-color: var(--primary);
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-            margin-right: 10px;
+        .qr-placeholder small {
+            color: var(--text-muted);
+            font-size: 0.85rem;
         }
 
         @keyframes spin {
             to { transform: rotate(360deg); }
+        }
+
+        .qr-status {
+            margin-top: 1.2rem;
+            padding: 0.7rem 1.5rem;
+            border-radius: 12px;
+            font-weight: 500;
+            font-size: 0.95rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .status-waiting {
+            background: rgba(245, 158, 11, 0.15);
+            color: var(--warning);
+            border: 1px solid rgba(245, 158, 11, 0.2);
+        }
+
+        .status-connecting {
+            background: rgba(6, 182, 212, 0.15);
+            color: var(--secondary);
+            border: 1px solid rgba(6, 182, 212, 0.2);
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        .status-connected {
+            background: rgba(16, 185, 129, 0.15);
+            color: var(--accent);
+            border: 1px solid rgba(16, 185, 129, 0.2);
+        }
+
+        .status-error {
+            background: rgba(239, 68, 68, 0.15);
+            color: var(--danger);
+            border: 1px solid rgba(239, 68, 68, 0.2);
+        }
+
+        .spinner-small {
+            display: inline-block;
+            width: 18px;
+            height: 18px;
+            border: 2px solid rgba(124, 58, 237, 0.2);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        .controls {
+            display: flex;
+            gap: 0.8rem;
+            margin-top: 1.2rem;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 0.7rem 1.5rem;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 0.95rem;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            border: none;
+            cursor: pointer;
+        }
+
+        .btn-primary {
+            background: var(--gradient-primary);
+            color: white;
+            box-shadow: 0 4px 15px rgba(124, 58, 237, 0.3);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(124, 58, 237, 0.4);
+        }
+
+        .btn-success {
+            background: var(--gradient-success);
+            color: white;
+            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+        }
+
+        .btn-success:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(16, 185, 129, 0.4);
+        }
+
+        .btn-secondary {
+            background: rgba(124, 58, 237, 0.1);
+            color: var(--text-primary);
+            border: 1px solid rgba(124, 58, 237, 0.2);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(124, 58, 237, 0.2);
+            transform: translateY(-2px);
+        }
+
+        .btn-danger {
+            background: rgba(239, 68, 68, 0.15);
+            color: var(--danger);
+            border: 1px solid rgba(239, 68, 68, 0.2);
+        }
+
+        .btn-danger:hover {
+            background: rgba(239, 68, 68, 0.25);
+            transform: translateY(-2px);
         }
 
         .steps-list {
@@ -248,8 +409,8 @@ const QR_DASHBOARD = `
         }
 
         .steps-list li {
-            padding: 1rem;
-            margin-bottom: 0.8rem;
+            padding: 0.8rem 1rem;
+            margin-bottom: 0.6rem;
             background: rgba(15, 23, 42, 0.6);
             border-radius: 12px;
             display: flex;
@@ -267,96 +428,113 @@ const QR_DASHBOARD = `
         .step-number {
             background: var(--gradient-primary);
             color: white;
-            width: 30px;
-            height: 30px;
+            width: 28px;
+            height: 28px;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
             font-weight: bold;
-            font-size: 0.9rem;
+            font-size: 0.8rem;
             flex-shrink: 0;
         }
 
         .step-text {
             color: var(--text-secondary);
-            line-height: 1.5;
+            line-height: 1.4;
+            font-size: 0.95rem;
         }
 
         .step-text strong {
             color: white;
         }
 
-        .btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 10px;
-            padding: 0.8rem 1.8rem;
-            border-radius: 12px;
-            font-weight: 600;
-            text-decoration: none;
-            transition: all 0.3s ease;
-            border: none;
-            cursor: pointer;
-        }
-
-        .btn-primary {
-            background: var(--gradient-primary);
-            color: white;
-        }
-
-        .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 30px rgba(124, 58, 237, 0.3);
-        }
-
-        .btn-secondary {
-            background: rgba(124, 58, 237, 0.1);
-            color: var(--text-primary);
-            border: 1px solid rgba(124, 58, 237, 0.3);
-        }
-
-        .btn-secondary:hover {
-            background: rgba(124, 58, 237, 0.2);
-        }
-
         .features-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 1rem;
-            margin-top: 1.5rem;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 0.8rem;
+            margin-top: 1rem;
         }
 
         .feature-item {
-            padding: 1rem;
+            padding: 0.8rem;
             background: rgba(15, 23, 42, 0.6);
-            border-radius: 12px;
+            border-radius: 10px;
             text-align: center;
             border: 1px solid rgba(124, 58, 237, 0.1);
+            transition: all 0.3s ease;
+        }
+
+        .feature-item:hover {
+            border-color: rgba(124, 58, 237, 0.3);
+            transform: translateY(-3px);
         }
 
         .feature-item i {
-            font-size: 2rem;
+            font-size: 1.5rem;
             color: var(--primary);
-            margin-bottom: 0.5rem;
+            margin-bottom: 0.3rem;
+            display: block;
         }
 
         .feature-item h4 {
             color: white;
-            font-size: 0.9rem;
+            font-size: 0.85rem;
         }
 
         .feature-item p {
             color: var(--text-muted);
-            font-size: 0.8rem;
+            font-size: 0.75rem;
         }
 
-        .controls {
+        .session-box {
+            margin-top: 1rem;
+            padding: 1rem;
+            background: rgba(15, 23, 42, 0.8);
+            border-radius: 12px;
+            border: 1px solid rgba(16, 185, 129, 0.2);
+            display: none;
+        }
+
+        .session-box.active {
+            display: block;
+            animation: slideDown 0.5s ease;
+        }
+
+        @keyframes slideDown {
+            0% { opacity: 0; transform: translateY(-10px); }
+            100% { opacity: 1; transform: translateY(0); }
+        }
+
+        .session-box .label {
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .session-box .code {
+            font-family: 'Courier New', monospace;
+            font-size: 0.8rem;
+            color: var(--text-primary);
+            background: rgba(30, 41, 59, 0.5);
+            padding: 0.8rem;
+            border-radius: 8px;
+            word-break: break-all;
+            max-height: 120px;
+            overflow-y: auto;
+            border: 1px solid rgba(124, 58, 237, 0.1);
+        }
+
+        .session-box .actions {
             display: flex;
-            gap: 1rem;
-            margin-top: 1.5rem;
+            gap: 0.8rem;
+            margin-top: 0.8rem;
             flex-wrap: wrap;
-            justify-content: center;
+        }
+
+        .session-box .actions .btn {
+            padding: 0.5rem 1rem;
+            font-size: 0.85rem;
         }
 
         .footer {
@@ -369,8 +547,11 @@ const QR_DASHBOARD = `
 
         @media (max-width: 480px) {
             .hero-title { font-size: 2rem; }
-            .nav-links a { padding: 0.3rem 0.6rem; font-size: 0.9rem; }
-            .card { padding: 1.5rem; }
+            .nav-links a { padding: 0.3rem 0.6rem; font-size: 0.85rem; }
+            .card { padding: 1.2rem; }
+            .qr-container { min-height: 280px; padding: 1rem; }
+            #qrImage { max-width: 200px; }
+            .controls .btn { padding: 0.5rem 1rem; font-size: 0.85rem; }
         }
     </style>
 </head>
@@ -384,7 +565,7 @@ const QR_DASHBOARD = `
             <div class="nav-links">
                 <a href="/">Home</a>
                 <a href="/pair">Pair Bot</a>
-                <a href="/qr">QR Scanner</a>
+                <a href="/qr" class="active">QR Scanner</a>
                 <a href="https://github.com/Fred1e/Fee-Xmd" target="_blank">
                     <i class="fab fa-github"></i>
                 </a>
@@ -398,6 +579,10 @@ const QR_DASHBOARD = `
             <p class="hero-subtitle">
                 Scan the QR code with WhatsApp to connect your device to FEE-XMD bot
             </p>
+            <div id="statusBadge" class="status-badge waiting">
+                <i class="fas fa-clock"></i>
+                <span>Waiting for connection...</span>
+            </div>
         </div>
 
         <div class="dashboard-grid">
@@ -408,17 +593,14 @@ const QR_DASHBOARD = `
                 </h2>
                 <div class="qr-container" id="qrContainer">
                     <img id="qrImage" src="" alt="QR Code" style="display: none;">
-                    <div id="qrPlaceholder" style="text-align: center; padding: 2rem;">
-                        <i class="fas fa-spinner fa-spin" style="font-size: 3rem; color: var(--primary);"></i>
-                        <p style="color: var(--text-secondary); margin-top: 1rem;">
-                            Generating QR Code...
-                            <br>
-                            <small>Please wait a moment</small>
-                        </p>
+                    <div id="qrPlaceholder" class="qr-placeholder">
+                        <i class="fas fa-spinner"></i>
+                        <p>Generating QR Code...</p>
+                        <small>Please wait a moment</small>
                     </div>
                     <div id="qrStatus" class="qr-status status-waiting">
-                        <span class="spinner"></span>
-                        Waiting for QR code...
+                        <i class="fas fa-clock"></i>
+                        <span>Waiting for QR code...</span>
                     </div>
                 </div>
                 <div class="controls">
@@ -426,7 +608,7 @@ const QR_DASHBOARD = `
                         <i class="fas fa-sync-alt"></i> Refresh QR
                     </button>
                     <button onclick="generatePairCode()" class="btn btn-secondary">
-                        <i class="fas fa-key"></i> Generate Pair Code
+                        <i class="fas fa-key"></i> Use Pair Code
                     </button>
                 </div>
             </div>
@@ -434,14 +616,14 @@ const QR_DASHBOARD = `
             <div class="card">
                 <h2 class="card-title">
                     <i class="fas fa-info-circle"></i>
-                    How to Use
+                    How to Connect
                 </h2>
                 <ul class="steps-list">
                     <li>
                         <span class="step-number">1</span>
                         <span class="step-text">
                             <strong>Open WhatsApp</strong><br>
-                            On your phone, open WhatsApp
+                            On your phone, open WhatsApp app
                         </span>
                     </li>
                     <li>
@@ -468,18 +650,46 @@ const QR_DASHBOARD = `
                     <li>
                         <span class="step-number">5</span>
                         <span class="step-text">
-                            <strong>Connect & Enjoy</strong><br>
-                            Your device will be connected to FEE-XMD!
+                            <strong>Get Session</strong><br>
+                            Your session ID will be sent via WhatsApp
                         </span>
                     </li>
                 </ul>
-                <div style="margin-top: 1rem; padding: 1rem; background: rgba(245, 158, 11, 0.1); border-radius: 12px; border-left: 3px solid var(--warning);">
-                    <p style="color: var(--text-secondary); font-size: 0.9rem;">
+                <div style="margin-top: 1rem; padding: 0.8rem; background: rgba(245, 158, 11, 0.08); border-radius: 10px; border-left: 3px solid var(--warning);">
+                    <p style="color: var(--text-secondary); font-size: 0.85rem;">
                         <i class="fas fa-shield-alt" style="color: var(--warning);"></i>
-                        <strong>Security Notice:</strong> QR codes expire after 2 minutes. 
-                        Refresh if it's not working.
+                        <strong>Security:</strong> QR codes expire after 2 minutes. 
+                        Session ID is sent only to your WhatsApp.
                     </p>
                 </div>
+            </div>
+        </div>
+
+        <!-- Session Display Box -->
+        <div class="card" style="margin-top: 2rem;" id="sessionCard">
+            <h2 class="card-title">
+                <i class="fas fa-key"></i>
+                Session Management
+            </h2>
+            <div class="session-box" id="sessionBox">
+                <div class="label">📋 Your Session ID (Copy this for deployment)</div>
+                <div class="code" id="sessionCode">Loading...</div>
+                <div class="actions">
+                    <button onclick="copySession()" class="btn btn-success">
+                        <i class="fas fa-copy"></i> Copy Session
+                    </button>
+                    <button onclick="downloadSession()" class="btn btn-primary">
+                        <i class="fas fa-download"></i> Download
+                    </button>
+                    <button onclick="clearSession()" class="btn btn-danger">
+                        <i class="fas fa-trash"></i> Clear
+                    </button>
+                </div>
+            </div>
+            <div id="noSession" style="text-align: center; padding: 1.5rem; color: var(--text-secondary);">
+                <i class="fas fa-qrcode" style="font-size: 2rem; color: var(--text-muted); display: block; margin-bottom: 0.5rem;"></i>
+                <p>Scan the QR code to receive your session</p>
+                <p style="font-size: 0.85rem; color: var(--text-muted);">Session will appear here after connecting</p>
             </div>
         </div>
 
@@ -522,7 +732,9 @@ const QR_DASHBOARD = `
 
     <script>
         let qrRefreshInterval = null;
-        let currentQR = null;
+        let statusCheckInterval = null;
+        let currentSessionId = '';
+        let sessionReceived = false;
 
         async function fetchQR() {
             try {
@@ -531,53 +743,108 @@ const QR_DASHBOARD = `
                 
                 const data = await response.json();
                 if (data.qr) {
-                    currentQR = data.qr;
                     const qrImage = document.getElementById('qrImage');
                     qrImage.src = data.qr;
                     qrImage.style.display = 'block';
+                    qrImage.classList.remove('connected');
                     
                     document.getElementById('qrPlaceholder').style.display = 'none';
                     
-                    const status = document.getElementById('qrStatus');
-                    status.className = 'qr-status status-connecting';
-                    status.innerHTML = '<span class="spinner"></span> Connecting to WhatsApp...';
-                    
-                    // Start checking connection status
-                    checkConnection();
+                    updateStatus('connecting', 'Connecting to WhatsApp...', 'fa-spinner fa-pulse');
+                    updateBadge('connecting', 'Connecting...');
                 }
             } catch (error) {
                 console.error('QR fetch error:', error);
-                const status = document.getElementById('qrStatus');
-                status.className = 'qr-status status-waiting';
-                status.innerHTML = '❌ Failed to generate QR. Please refresh.';
+                updateStatus('error', 'Failed to generate QR. Please refresh.', 'fa-exclamation-circle');
+                updateBadge('waiting', 'Error - Refresh');
             }
         }
 
-        async function checkConnection() {
+        async function checkStatus() {
             try {
                 const response = await fetch('/qr/status');
                 const data = await response.json();
                 
-                if (data.connected) {
-                    const status = document.getElementById('qrStatus');
-                    status.className = 'qr-status status-connected';
-                    status.innerHTML = '✅ Connected successfully!';
+                if (data.connected && !sessionReceived) {
+                    updateStatus('connected', '✅ Connected successfully!', 'fa-check-circle');
+                    updateBadge('connected', 'Connected ✅');
+                    
+                    const qrImage = document.getElementById('qrImage');
+                    qrImage.classList.add('connected');
+                    
+                    // Check for session
+                    checkSession();
+                    
+                    sessionReceived = true;
                     
                     if (qrRefreshInterval) {
                         clearInterval(qrRefreshInterval);
                         qrRefreshInterval = null;
                     }
                 }
+                
+                if (data.session) {
+                    displaySession(data.session);
+                }
             } catch (error) {
                 console.log('Status check error:', error);
             }
         }
 
+        async function checkSession() {
+            try {
+                const response = await fetch('/qr/getsession');
+                const data = await response.json();
+                
+                if (data.session) {
+                    displaySession(data.session);
+                }
+            } catch (error) {
+                console.log('Session check error:', error);
+            }
+        }
+
+        function displaySession(sessionId) {
+            currentSessionId = sessionId;
+            const sessionBox = document.getElementById('sessionBox');
+            const noSession = document.getElementById('noSession');
+            
+            sessionBox.classList.add('active');
+            noSession.style.display = 'none';
+            document.getElementById('sessionCode').textContent = sessionId;
+            
+            // Update status
+            updateStatus('connected', '✅ Session received! Check below', 'fa-check-circle');
+            updateBadge('connected', 'Session Ready ✅');
+        }
+
+        function updateStatus(type, message, icon) {
+            const status = document.getElementById('qrStatus');
+            status.className = `qr-status status-${type}`;
+            status.innerHTML = `<i class="fas ${icon}"></i><span>${message}</span>`;
+        }
+
+        function updateBadge(type, text) {
+            const badge = document.getElementById('statusBadge');
+            badge.className = `status-badge ${type}`;
+            const icon = type === 'waiting' ? 'fa-clock' : 
+                        type === 'connecting' ? 'fa-spinner fa-pulse' : 
+                        type === 'connected' ? 'fa-check-circle' : 'fa-exclamation-circle';
+            badge.innerHTML = `<i class="fas ${icon}"></i><span>${text}</span>`;
+        }
+
         function refreshQR() {
+            sessionReceived = false;
+            currentSessionId = '';
+            
             document.getElementById('qrImage').style.display = 'none';
             document.getElementById('qrPlaceholder').style.display = 'block';
-            document.getElementById('qrStatus').className = 'qr-status status-waiting';
-            document.getElementById('qrStatus').innerHTML = '⏳ Generating new QR code...';
+            
+            document.getElementById('sessionBox').classList.remove('active');
+            document.getElementById('noSession').style.display = 'block';
+            
+            updateStatus('waiting', 'Generating new QR code...', 'fa-clock');
+            updateBadge('waiting', 'Generating...');
             
             if (qrRefreshInterval) {
                 clearInterval(qrRefreshInterval);
@@ -586,9 +853,10 @@ const QR_DASHBOARD = `
             
             fetchQR();
             
-            // Set up periodic refresh (every 2 minutes)
             qrRefreshInterval = setInterval(() => {
-                fetchQR();
+                if (!sessionReceived) {
+                    fetchQR();
+                }
             }, 120000);
         }
 
@@ -596,14 +864,60 @@ const QR_DASHBOARD = `
             window.location.href = '/pair';
         }
 
+        function copySession() {
+            if (!currentSessionId) return;
+            
+            navigator.clipboard.writeText(currentSessionId).then(() => {
+                const btn = event.target.closest('.btn');
+                const originalText = btn.innerHTML;
+                btn.innerHTML = '<i class="fas fa-check"></i> Copied!';
+                btn.classList.add('btn-success');
+                setTimeout(() => {
+                    btn.innerHTML = originalText;
+                    btn.classList.remove('btn-success');
+                }, 2000);
+            }).catch(() => {
+                // Fallback
+                const textarea = document.createElement('textarea');
+                textarea.value = currentSessionId;
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+                alert('Session copied to clipboard!');
+            });
+        }
+
+        function downloadSession() {
+            if (!currentSessionId) return;
+            
+            const blob = new Blob([currentSessionId], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `fee-xmd-session-${Date.now()}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        function clearSession() {
+            currentSessionId = '';
+            document.getElementById('sessionBox').classList.remove('active');
+            document.getElementById('noSession').style.display = 'block';
+            sessionReceived = false;
+        }
+
         // Initial fetch
         document.addEventListener('DOMContentLoaded', () => {
             fetchQR();
             
-            // Check connection status every 5 seconds
-            setInterval(() => {
-                checkConnection();
-            }, 5000);
+            // Check status every 3 seconds
+            statusCheckInterval = setInterval(checkStatus, 3000);
+            
+            // Check session every 5 seconds
+            setInterval(checkSession, 5000);
         });
     </script>
 </body>
@@ -620,6 +934,7 @@ router.get('/generate', async (req, res) => {
     const id = makeid();
     const tempDir = path.join(__dirname, 'temp', id);
     let qrSent = false;
+    let sessionGenerated = false;
 
     try {
         const { version } = await fetchLatestBaileysVersion();
@@ -636,7 +951,9 @@ router.get('/generate', async (req, res) => {
             browser: Browsers.ubuntu('Chrome', '125'),
             syncFullHistory: false,
             connectTimeoutMs: 60000,
-            keepAliveIntervalMs: 30000
+            keepAliveIntervalMs: 30000,
+            generateHighQualityLinkPreview: true,
+            markOnlineOnConnect: true
         });
 
         sock.ev.on('creds.update', saveCreds);
@@ -648,45 +965,58 @@ router.get('/generate', async (req, res) => {
                 qrSent = true;
                 const qrBuffer = await QRCode.toDataURL(qr);
                 res.json({ qr: qrBuffer });
-                
-                // Clean up after QR is generated
-                setTimeout(() => {
-                    removeFile(tempDir);
-                }, 120000);
             }
 
             if (connection === 'open') {
-                // Send welcome message
-                await sock.sendMessage(sock.user.id, {
+                console.log('✅ Device connected via QR!');
+                const userJid = sock.user.id;
+                
+                // Send welcome message with buttons
+                await sock.sendMessage(userJid, {
                     text: `
-╭━━━━━━━━━━━━━━━━━━━━━╮
-┃   ✅ *CONNECTED!*   ┃
-╰━━━━━━━━━━━━━━━━━━━━━╯
+╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮
+┃   ✅ *DEVICE CONNECTED!*      ┃
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
 
-👋 Your device is now connected to FEE-XMD!
+👋 *Welcome to FEE-XMD!*
 
-📦 Your session is being generated...
-Please wait a moment.
+🤖 Your device is now connected to the bot.
 
-_✨ Welcome to FEE-XMD Bot!_`
+⏳ *Generating your secure session ID...*
+This will take a few moments.
+
+_✨ Powered by Fredi AI Tech_`,
+                    buttons: [
+                        {
+                            buttonId: 'get_started',
+                            buttonText: { displayText: '🚀 Get Started' },
+                            type: 1
+                        }
+                    ],
+                    headerType: 1
                 });
 
-                await delay(5000);
-                
+                await delay(3000);
+
+                // Read session from file
                 const credsPath = path.join(tempDir, 'creds.json');
                 let sessionData = null;
                 let attempts = 0;
-                
-                while (attempts < 10 && !sessionData) {
+                const maxAttempts = 15;
+
+                console.log('⏳ Waiting for session file...');
+
+                while (attempts < maxAttempts && !sessionData) {
                     try {
                         if (fs.existsSync(credsPath)) {
                             const data = fs.readFileSync(credsPath);
                             if (data && data.length > 50) {
                                 sessionData = data;
+                                console.log('✅ Session file found!');
                                 break;
                             }
                         }
-                        await delay(3000);
+                        await delay(2000);
                         attempts++;
                     } catch (e) {
                         await delay(2000);
@@ -695,29 +1025,206 @@ _✨ Welcome to FEE-XMD Bot!_`
                 }
 
                 if (sessionData) {
-                    const base64 = Buffer.from(sessionData).toString('base64');
-                    
-                    await sock.sendMessage(sock.user.id, {
-                        text: `📋 *Your Session ID:*\n\`\`\`${base64}\`\`\`\n\n⚠️ Save this securely!`,
+                    const base64Session = Buffer.from(sessionData).toString('base64');
+                    console.log('✅ Session generated, length:', base64Session.length);
+                    sessionGenerated = true;
+
+                    // Send session with interactive buttons
+                    const sessionMessage = `
+╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮
+┃   🔐 *SESSION READY!*         ┃
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
+
+📦 *Your Session ID:*
+\`\`\`
+${base64Session}
+\`\`\`
+
+⚠️ *IMPORTANT:*
+• Save this session ID securely
+• Use it to deploy your FEE-XMD bot
+• One-time use only
+• Valid for 24 hours
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📌 *Quick Actions:*`;
+
+                    await sock.sendMessage(userJid, {
+                        text: sessionMessage,
                         buttons: [
                             {
                                 buttonId: 'copy_session',
-                                buttonText: { displayText: '📋 Copy Session' },
+                                buttonText: { displayText: '📋 Copy Session ID' },
+                                type: 1
+                            },
+                            {
+                                buttonId: 'share_session',
+                                buttonText: { displayText: '📤 Share Session' },
+                                type: 1
+                            },
+                            {
+                                buttonId: 'deploy_guide',
+                                buttonText: { displayText: '🚀 Deploy Guide' },
                                 type: 1
                             }
                         ],
                         headerType: 1
+                    });
+
+                    await delay(1000);
+
+                    // Send full session in code block
+                    await sock.sendMessage(userJid, {
+                        text: `📋 *Full Session ID:*\n\n\`\`\`${base64Session}\`\`\``,
+                        buttons: [
+                            {
+                                buttonId: 'copy_full',
+                                buttonText: { displayText: '📋 Copy Full' },
+                                type: 1
+                            }
+                        ],
+                        headerType: 1
+                    });
+
+                    await delay(1000);
+
+                    // Send deployment info
+                    const infoText = `
+╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮
+┃   🌟 *DEPLOYMENT RESOURCES*    ┃
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
+
+📌 *Helpful Links:*
+• 👑 Owner: wa.me/255752593977
+• 💬 Group: https://chat.whatsapp.com/FA1GPSjfUQLCyFbquWnRIS
+• 📢 Channel: https://whatsapp.com/channel/0029Vb6mzVF7tkj42VNPrZ3V
+• 📸 Instagram: @frediezra
+• 💻 GitHub: https://github.com/Fred1e/Fee-Xmd
+
+🧠 *Support FEE-XMD:*
+⭐ Star & 🍴 Fork the repo!
+
+🩷 *#Thanks | #FrediAI2026 | #FEEBot*`;
+
+                    await sock.sendMessage(userJid, {
+                        text: infoText,
+                        buttons: [
+                            {
+                                buttonId: 'open_github',
+                                buttonText: { displayText: '🔗 Open Repository' },
+                                type: 1
+                            },
+                            {
+                                buttonId: 'join_group',
+                                buttonText: { displayText: '👥 Join Group' },
+                                type: 1
+                            }
+                        ],
+                        headerType: 1
+                    });
+
+                    // Store session for dashboard
+                    activeSessions[id] = {
+                        session: base64Session,
+                        user: userJid,
+                        timestamp: Date.now()
+                    };
+
+                    console.log('✅ Session sent to:', userJid);
+                } else {
+                    await sock.sendMessage(userJid, {
+                        text: '❌ Failed to generate session. Please try again.'
                     });
                 }
 
                 await delay(2000);
                 sock.ws.close();
                 removeFile(tempDir);
+
+                // Clean up after 5 minutes
+                setTimeout(() => {
+                    delete activeSessions[id];
+                }, 300000);
             }
 
             if (connection === 'close' && lastDisconnect?.error?.output?.statusCode !== 401) {
+                console.log('⚠️ Connection closed, reconnecting...');
                 await delay(5000);
                 // Reconnect logic
+            }
+        });
+
+        // Handle button clicks
+        sock.ev.on('messages.upsert', async (m) => {
+            try {
+                const msg = m.messages[0];
+                if (!msg.key || msg.key.fromMe) return;
+                if (!msg.message) return;
+
+                const messageType = getContentType(msg.message);
+                const sender = msg.key.remoteJid;
+
+                if (messageType === 'buttonsResponseMessage') {
+                    const buttonId = msg.message.buttonsResponseMessage.selectedButtonId;
+                    console.log('🔘 Button clicked:', buttonId);
+
+                    switch(buttonId) {
+                        case 'copy_session':
+                        case 'copy_full':
+                            await sock.sendMessage(sender, {
+                                text: '📋 *Session copied to clipboard!*\n\n_You can paste it in your deployment settings._'
+                            });
+                            break;
+
+                        case 'share_session':
+                            await sock.sendMessage(sender, {
+                                text: '📤 *Share this session*\n\n_Please keep it secure._'
+                            });
+                            break;
+
+                        case 'deploy_guide':
+                            await sock.sendMessage(sender, {
+                                text: `🚀 *Deployment Guide*
+
+1. Copy your session ID
+2. Go to your hosting platform
+3. Set SESSION_ID environment variable
+4. Deploy the bot
+5. Enjoy FEE-XMD!
+
+📖 Full guide: https://github.com/Fred1e/Fee-Xmd#readme`
+                            });
+                            break;
+
+                        case 'open_github':
+                            await sock.sendMessage(sender, {
+                                text: '🔗 *FEE-XMD Repository*\n\nhttps://github.com/Fred1e/Fee-Xmd'
+                            });
+                            break;
+
+                        case 'join_group':
+                            await sock.sendMessage(sender, {
+                                text: '👥 *Join Our Community*\n\nhttps://chat.whatsapp.com/FA1GPSjfUQLCyFbquWnRIS'
+                            });
+                            break;
+
+                        case 'get_started':
+                            await sock.sendMessage(sender, {
+                                text: `🚀 *Getting Started with FEE-XMD*
+
+1. Your session ID has been sent above
+2. Copy and save it securely
+3. Deploy on your preferred platform
+4. Use commands like !help, !menu
+
+✨ *Happy Botting!*`
+                            });
+                            break;
+                    }
+                }
+            } catch (error) {
+                console.error('Message handler error:', error);
             }
         });
 
@@ -739,7 +1246,20 @@ _✨ Welcome to FEE-XMD Bot!_`
 
 // Status endpoint
 router.get('/status', async (req, res) => {
-    res.json({ connected: false, status: 'waiting' });
+    res.json({ 
+        connected: Object.keys(activeSessions).length > 0,
+        status: Object.keys(activeSessions).length > 0 ? 'connected' : 'waiting'
+    });
+});
+
+// Get session endpoint
+router.get('/getsession', async (req, res) => {
+    const sessions = Object.values(activeSessions);
+    if (sessions.length > 0) {
+        res.json({ session: sessions[sessions.length - 1].session });
+    } else {
+        res.json({ session: null });
+    }
 });
 
 module.exports = router;
