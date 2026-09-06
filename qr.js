@@ -25,34 +25,8 @@ function removeFile(filePath) {
     }
 }
 
-function formatSessionMessage(sessionId) {
-    return `
-╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮
-┃   🔐 *SESSION GENERATED!*     ┃
-╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
-
-✅ *Device Linked Successfully!*
-
-📦 *Your Session ID:*
-\`\`\`
-${sessionId}
-\`\`\`
-
-⚠️ *IMPORTANT:*
-• Save this session ID securely
-• Use it to deploy your FEE-XMD bot
-• One-time use only
-• Valid for 24 hours
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-📌 *Quick Actions:*
-`;
-}
-
-// QR Dashboard HTML with enhanced UI
-const QR_DASHBOARD = `
-<!DOCTYPE html>
+// QR Dashboard HTML
+const QR_DASHBOARD = `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -665,7 +639,6 @@ const QR_DASHBOARD = `
             </div>
         </div>
 
-        <!-- Session Display Box -->
         <div class="card" style="margin-top: 2rem;" id="sessionCard">
             <h2 class="card-title">
                 <i class="fas fa-key"></i>
@@ -766,13 +739,12 @@ const QR_DASHBOARD = `
                 const data = await response.json();
                 
                 if (data.connected && !sessionReceived) {
-                    updateStatus('connected', '✅ Connected successfully!', 'fa-check-circle');
-                    updateBadge('connected', 'Connected ✅');
+                    updateStatus('connected', 'Connected successfully!', 'fa-check-circle');
+                    updateBadge('connected', 'Connected');
                     
                     const qrImage = document.getElementById('qrImage');
                     qrImage.classList.add('connected');
                     
-                    // Check for session
                     checkSession();
                     
                     sessionReceived = true;
@@ -813,24 +785,24 @@ const QR_DASHBOARD = `
             noSession.style.display = 'none';
             document.getElementById('sessionCode').textContent = sessionId;
             
-            // Update status
-            updateStatus('connected', '✅ Session received! Check below', 'fa-check-circle');
-            updateBadge('connected', 'Session Ready ✅');
+            updateStatus('connected', 'Session received! Check below', 'fa-check-circle');
+            updateBadge('connected', 'Session Ready');
         }
 
         function updateStatus(type, message, icon) {
             const status = document.getElementById('qrStatus');
-            status.className = `qr-status status-${type}`;
-            status.innerHTML = `<i class="fas ${icon}"></i><span>${message}</span>`;
+            status.className = 'qr-status status-' + type;
+            status.innerHTML = '<i class="fas ' + icon + '"></i><span>' + message + '</span>';
         }
 
         function updateBadge(type, text) {
             const badge = document.getElementById('statusBadge');
-            badge.className = `status-badge ${type}`;
-            const icon = type === 'waiting' ? 'fa-clock' : 
-                        type === 'connecting' ? 'fa-spinner fa-pulse' : 
-                        type === 'connected' ? 'fa-check-circle' : 'fa-exclamation-circle';
-            badge.innerHTML = `<i class="fas ${icon}"></i><span>${text}</span>`;
+            badge.className = 'status-badge ' + type;
+            var icon = 'fa-clock';
+            if (type === 'connecting') icon = 'fa-spinner fa-pulse';
+            else if (type === 'connected') icon = 'fa-check-circle';
+            else if (type === 'error') icon = 'fa-exclamation-circle';
+            badge.innerHTML = '<i class="fas ' + icon + '"></i><span>' + text + '</span>';
         }
 
         function refreshQR() {
@@ -853,7 +825,7 @@ const QR_DASHBOARD = `
             
             fetchQR();
             
-            qrRefreshInterval = setInterval(() => {
+            qrRefreshInterval = setInterval(function() {
                 if (!sessionReceived) {
                     fetchQR();
                 }
@@ -867,18 +839,15 @@ const QR_DASHBOARD = `
         function copySession() {
             if (!currentSessionId) return;
             
-            navigator.clipboard.writeText(currentSessionId).then(() => {
-                const btn = event.target.closest('.btn');
-                const originalText = btn.innerHTML;
+            navigator.clipboard.writeText(currentSessionId).then(function() {
+                var btn = document.querySelector('.session-box .actions .btn-success');
+                var originalText = btn.innerHTML;
                 btn.innerHTML = '<i class="fas fa-check"></i> Copied!';
-                btn.classList.add('btn-success');
-                setTimeout(() => {
+                setTimeout(function() {
                     btn.innerHTML = originalText;
-                    btn.classList.remove('btn-success');
                 }, 2000);
-            }).catch(() => {
-                // Fallback
-                const textarea = document.createElement('textarea');
+            }).catch(function() {
+                var textarea = document.createElement('textarea');
                 textarea.value = currentSessionId;
                 document.body.appendChild(textarea);
                 textarea.select();
@@ -891,11 +860,11 @@ const QR_DASHBOARD = `
         function downloadSession() {
             if (!currentSessionId) return;
             
-            const blob = new Blob([currentSessionId], { type: 'text/plain' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
+            var blob = new Blob([currentSessionId], { type: 'text/plain' });
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a');
             a.href = url;
-            a.download = `fee-xmd-session-${Date.now()}.txt`;
+            a.download = 'fee-xmd-session-' + Date.now() + '.txt';
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -909,20 +878,16 @@ const QR_DASHBOARD = `
             sessionReceived = false;
         }
 
-        // Initial fetch
-        document.addEventListener('DOMContentLoaded', () => {
+        document.addEventListener('DOMContentLoaded', function() {
             fetchQR();
             
-            // Check status every 3 seconds
             statusCheckInterval = setInterval(checkStatus, 3000);
             
-            // Check session every 5 seconds
             setInterval(checkSession, 5000);
         });
     </script>
 </body>
-</html>
-`;
+</html>`;
 
 // QR Generation endpoint
 router.get('/', async (req, res) => {
@@ -968,10 +933,10 @@ router.get('/generate', async (req, res) => {
             }
 
             if (connection === 'open') {
-                console.log('✅ Device connected via QR!');
+                console.log('Device connected via QR!');
                 const userJid = sock.user.id;
                 
-                // Send welcome message with buttons
+                // Send welcome message
                 await sock.sendMessage(userJid, {
                     text: `
 ╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮
@@ -1004,7 +969,7 @@ _✨ Powered by Fredi AI Tech_`,
                 let attempts = 0;
                 const maxAttempts = 15;
 
-                console.log('⏳ Waiting for session file...');
+                console.log('Waiting for session file...');
 
                 while (attempts < maxAttempts && !sessionData) {
                     try {
@@ -1012,7 +977,7 @@ _✨ Powered by Fredi AI Tech_`,
                             const data = fs.readFileSync(credsPath);
                             if (data && data.length > 50) {
                                 sessionData = data;
-                                console.log('✅ Session file found!');
+                                console.log('Session file found!');
                                 break;
                             }
                         }
@@ -1026,7 +991,7 @@ _✨ Powered by Fredi AI Tech_`,
 
                 if (sessionData) {
                     const base64Session = Buffer.from(sessionData).toString('base64');
-                    console.log('✅ Session generated, length:', base64Session.length);
+                    console.log('Session generated, length:', base64Session.length);
                     sessionGenerated = true;
 
                     // Send session with interactive buttons
@@ -1076,7 +1041,7 @@ ${base64Session}
 
                     // Send full session in code block
                     await sock.sendMessage(userJid, {
-                        text: `📋 *Full Session ID:*\n\n\`\`\`${base64Session}\`\`\``,
+                        text: '📋 *Full Session ID:*\n\n```' + base64Session + '```',
                         buttons: [
                             {
                                 buttonId: 'copy_full',
@@ -1131,7 +1096,7 @@ ${base64Session}
                         timestamp: Date.now()
                     };
 
-                    console.log('✅ Session sent to:', userJid);
+                    console.log('Session sent to:', userJid);
                 } else {
                     await sock.sendMessage(userJid, {
                         text: '❌ Failed to generate session. Please try again.'
@@ -1142,16 +1107,14 @@ ${base64Session}
                 sock.ws.close();
                 removeFile(tempDir);
 
-                // Clean up after 5 minutes
-                setTimeout(() => {
+                setTimeout(function() {
                     delete activeSessions[id];
                 }, 300000);
             }
 
             if (connection === 'close' && lastDisconnect?.error?.output?.statusCode !== 401) {
-                console.log('⚠️ Connection closed, reconnecting...');
+                console.log('Connection closed, reconnecting...');
                 await delay(5000);
-                // Reconnect logic
             }
         });
 
@@ -1167,7 +1130,7 @@ ${base64Session}
 
                 if (messageType === 'buttonsResponseMessage') {
                     const buttonId = msg.message.buttonsResponseMessage.selectedButtonId;
-                    console.log('🔘 Button clicked:', buttonId);
+                    console.log('Button clicked:', buttonId);
 
                     switch(buttonId) {
                         case 'copy_session':
@@ -1185,15 +1148,7 @@ ${base64Session}
 
                         case 'deploy_guide':
                             await sock.sendMessage(sender, {
-                                text: `🚀 *Deployment Guide*
-
-1. Copy your session ID
-2. Go to your hosting platform
-3. Set SESSION_ID environment variable
-4. Deploy the bot
-5. Enjoy FEE-XMD!
-
-📖 Full guide: https://github.com/Fred1e/Fee-Xmd#readme`
+                                text: '🚀 *Deployment Guide*\n\n1. Copy your session ID\n2. Go to your hosting platform\n3. Set SESSION_ID environment variable\n4. Deploy the bot\n5. Enjoy FEE-XMD!\n\n📖 Full guide: https://github.com/Fred1e/Fee-Xmd#readme'
                             });
                             break;
 
@@ -1211,14 +1166,7 @@ ${base64Session}
 
                         case 'get_started':
                             await sock.sendMessage(sender, {
-                                text: `🚀 *Getting Started with FEE-XMD*
-
-1. Your session ID has been sent above
-2. Copy and save it securely
-3. Deploy on your preferred platform
-4. Use commands like !help, !menu
-
-✨ *Happy Botting!*`
+                                text: '🚀 *Getting Started with FEE-XMD*\n\n1. Your session ID has been sent above\n2. Copy and save it securely\n3. Deploy on your preferred platform\n4. Use commands like !help, !menu\n\n✨ *Happy Botting!*'
                             });
                             break;
                     }
@@ -1229,7 +1177,7 @@ ${base64Session}
         });
 
         // Handle timeout
-        setTimeout(() => {
+        setTimeout(function() {
             if (!qrSent && !res.headersSent) {
                 res.status(408).json({ error: 'QR generation timeout' });
             }
@@ -1246,15 +1194,16 @@ ${base64Session}
 
 // Status endpoint
 router.get('/status', async (req, res) => {
+    var hasSessions = Object.keys(activeSessions).length > 0;
     res.json({ 
-        connected: Object.keys(activeSessions).length > 0,
-        status: Object.keys(activeSessions).length > 0 ? 'connected' : 'waiting'
+        connected: hasSessions,
+        status: hasSessions ? 'connected' : 'waiting'
     });
 });
 
 // Get session endpoint
 router.get('/getsession', async (req, res) => {
-    const sessions = Object.values(activeSessions);
+    var sessions = Object.values(activeSessions);
     if (sessions.length > 0) {
         res.json({ session: sessions[sessions.length - 1].session });
     } else {
