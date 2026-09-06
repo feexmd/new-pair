@@ -1,3 +1,4 @@
+// id.js
 function makeid(num = 4) {
   let result = "";
   let characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
@@ -7,4 +8,12 @@ function makeid(num = 4) {
   }
   return result;
 }
-module.exports = {makeid};
+
+// Generate unique session ID
+function generateSessionId() {
+  const timestamp = Date.now().toString(36);
+  const random = Math.random().toString(36).substring(2, 8);
+  return `FEE_${timestamp}_${random}`;
+}
+
+module.exports = { makeid, generateSessionId };
